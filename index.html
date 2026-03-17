@@ -705,49 +705,61 @@
             async init() {
                 lucide.createIcons();
 
-// SHARE FEATURE START
+                // SHARE FEATURE START
+                const urlParams = new URLSearchParams(window.location.search);
+                const shareId = urlParams.get("share");
 
-const urlParams = new URLSearchParams(window.location.search);
-const shareId = urlParams.get("share");
+                if (shareId) {
+                    console.log("[Share] Share ID detected:", shareId);
+                    state.isSharedMode = true;
 
-console.log("Share ID:", shareId);
+                    const loadShare = async () => {
+                        try {
+                            // If it matches a 36-char UUID format, try loading full JSON data from 'shares' table
+                            if (shareId.length === 36) {
+                                console.log("[Share] Fetching data from 'shares' table...");
+                                const { data, error } = await supabase
+                                    .from("shares")
+                                    .select("*")
+                                    .eq("id", shareId)
+                                    .single();
 
-if (shareId) {
-  const loadShare = async () => {
-    const { data, error } = await supabase
-      .from("shares")
-      .select("*")
-      .eq("id", shareId)
-      .single();
+                                console.log("[Share] Share data fetched:", data);
+                                if (error) console.log("[Share] Fetch Error:", error);
 
-    console.log("Share data:", data);
-    console.log("Error:", error);
+                                if (!data || !data.data) {
+                                    console.log("[Share] Data not found or invalid.");
+                                    app.showSharedBillContainer();
+                                    app.showInvalidShareLink($('shared-bill-container'));
+                                    app.hideGlobalLoader();
+                                    return;
+                                }
 
-    if (!data) {
-      document.body.innerHTML = `
-        <h2 style="text-align:center;margin-top:50px;color:red;">
-          Invalid or Expired Link
-        </h2>
-      `;
-      return;
-    }
+                                // Successfully retrieved the nested JSON payload
+                                console.log("[Share] Valid JSON payload found, rendering UI.");
+                                app.showSharedBillContainer();
+                                app.renderSharedBill(data.data);
+                                app.hideGlobalLoader();
+                                return;
+                            }
+                            
+                            // If not a UUID or UUID bypass, fallback to original dashboard share RPC logic
+                            app.showSharedContainer();
+                            await app.loadSharedDashboard(shareId);
+                            app.hideGlobalLoader();
+                            
+                        } catch (err) {
+                            console.error("[Share] Exception during share load:", err);
+                            app.showSharedBillContainer();
+                            app.showInvalidShareLink($('shared-bill-container'));
+                            app.hideGlobalLoader();
+                        }
+                    };
 
-    const { data: bill } = await supabase
-      .from("bills")
-      .select("*")
-      .eq("id", data.bill_id)
-      .single();
-
-    console.log("Bill:", bill);
-
-    // TODO: show bill data in UI
-  };
-
-  loadShare();
-  return;
-}
-
-// SHARE FEATURE END
+                    loadShare();
+                    return; // Return immediately to prevent auth flow from running for shared links
+                }
+                // SHARE FEATURE END
 
                 try {
                     const { data: { user }, error } = await supabase.auth.getUser();
@@ -783,52 +795,50 @@ if (shareId) {
             async generateBillShareLink(billId) {
                 console.log(`[Share] Generating link for bill: ${billId}`);
                 try {
+                    // Fetch full data from local state to save into JSON
+                    const bill = state.bills.find(b => b.id === billId);
+                    const expenses = state.expenses.filter(e => e.bill_id === billId);
+                    
+                    if (!bill) throw new Error("Bill data not found locally");
+
                     const shareId = crypto.randomUUID();
                     console.log(`[Share] Created UUID: ${shareId}`);
+                    
+                    const payloadData = {
+                        bill: bill,
+                        expenses: expenses
+                    };
 
+                    // Insert full JSON into the data column
                     const { error } = await supabase.from('shares').insert({
                         id: shareId,
-                        bill_id: billId
+                        data: payloadData
                     });
 
-                    if (error) throw error;
+                    if (error) {
+                        console.error("[Share] Supabase Insert Error:", error);
+                        throw error;
+                    }
                     
                     const shareUrl = `${window.location.origin}${window.location.pathname}?share=${shareId}`;
-                    console.log(`[Share] Link generated: ${shareUrl}`);
+                    console.log(`[Share] Link generated successfully: ${shareUrl}`);
 
                     await navigator.clipboard.writeText(shareUrl);
                     this.showToast("Bill Share Link copied to clipboard!", "success");
 
                 } catch (err) {
-                    console.error("[Share] Error:", err);
+                    console.error("[Share] Error generating link:", err);
                     this.showToast("Failed to generate share link", "error");
                 }
             },
 
-            async loadSharedBillData(shareRecord) {
+            renderSharedBill(payload) {
                 const sbCont = $('shared-bill-container');
                 if (!sbCont) return;
 
                 try {
-                    console.log(`[Share] Fetching bill data for bill_id: ${shareRecord.bill_id}`);
+                    const { bill, expenses } = payload;
                     
-                    // Fetch bill details
-                    const { data: bill, error: billErr } = await supabase
-                        .from('bills')
-                        .select('*')
-                        .eq('id', shareRecord.bill_id)
-                        .maybeSingle();
-
-                    if (billErr || !bill) throw new Error("Bill not found.");
-
-                    // Fetch associated expenses
-                    const { data: expenses, error: expErr } = await supabase
-                        .from('expenses')
-                        .select('*')
-                        .eq('bill_id', shareRecord.bill_id);
-
-                    if (expErr) throw expErr;
-
                     let expensesHtml = expenses.map(exp => `
                         <div class="flex justify-between items-center py-3 border-b border-slate-100 last:border-0">
                             <div class="flex items-center gap-3">
@@ -871,7 +881,7 @@ if (shareId) {
                     `;
                     lucide.createIcons();
                 } catch (err) {
-                    console.error("Error loading shared bill data:", err);
+                    console.error("Error rendering shared bill data:", err);
                     this.showInvalidShareLink(sbCont);
                 }
             },

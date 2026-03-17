@@ -842,38 +842,6 @@
         totalEl.innerText = `₹${total.toFixed(2)}`;
     }
 },
-renderSharedData(payload) {
-    const tbody = document.getElementById("shared-tbody");
-    if (!tbody) return;
-
-    tbody.innerHTML = "";
-
-    let total = 0;
-
-    (payload.members || []).forEach(m => {
-        const exps = (payload.expenses || []).filter(e => e.member_id === m.member_id);
-
-        const pending = exps
-            .filter(e => e.status === "Pending")
-            .reduce((s, e) => s + Number(e.amount || 0), 0);
-
-        if (pending > 0) {
-            total += pending;
-
-            tbody.innerHTML += `
-                <tr>
-                    <td>${m.name || '-'}</td>
-                    <td>₹${pending.toFixed(2)}</td>
-                </tr>
-            `;
-        }
-    });
-
-    const totalEl = document.getElementById("shared-total-pending");
-    if (totalEl) {
-        totalEl.innerText = `₹${total.toFixed(2)}`;
-    }
-},
 
             showShareError(title, subtitle) {
                 const container = $('shared-container');

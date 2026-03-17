@@ -769,7 +769,7 @@
             },
 
             async loadSharedData(shareId) {
-                console.log("Querying share id:", shareId); // ✅ ONLY HERE
+                console.log("Share ID:", shareId);
 
                 state.isSharedMode = true;
 
@@ -783,25 +783,23 @@
                         .maybeSingle();
 
                     console.log("Fetched Data:", data);
-                    if (error) console.error(error);
 
-                    if (!data || !data.data) {
-                        this.showSharedContainer();
-                        this.showShareError("Invalid Link", "This share link does not exist or has been removed.");
-                        this.hideGlobalLoader();
+                    if (error || !data || !data.data) {
+                        console.error("❌ Invalid Share Data");
+                        this.hideGlobalLoader(); // 🔥 IMPORTANT
+                        alert("Invalid Share Link");
                         return;
                     }
 
-                    this.showSharedContainer();
                     this.renderSharedData(data.data);
-                    this.hideGlobalLoader();
-                    
+
                 } catch (err) {
-                    console.error("[Share] Load Error:", err);
-                    this.showSharedContainer();
-                    this.showShareError("Failed to load data", "An unexpected network or database error occurred.");
-                    this.hideGlobalLoader();
+                    console.error("❌ Share Load Error:", err);
+                    alert("Something went wrong");
                 }
+
+                // 🔥 ALWAYS RUN
+                this.hideGlobalLoader();
             },
 
             renderSharedData(payload) {

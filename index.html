@@ -704,51 +704,58 @@
                 }
             },
 
-            async ensureShareExists() {
-                if (!state.currentUser) return;
+            async ensureShareExists(user) {
+                if (!user) return;
                 try {
-                    const { data, error } = await supabase.from('shares').select('id').eq('id', state.currentUser.id).maybeSingle();
+                    const { data, error } = await supabase
+                        .from("shares")
+                        .select("id")
+                        .eq("id", user.id)
+                        .maybeSingle();
+
                     if (error) throw error;
-                    
+
                     if (!data) {
-                        await this.updateShareData();
+                        await supabase.from("shares").insert({
+                            id: user.id,
+                            data: { members: state.members, expenses: state.expenses, profile: state.userProfile },
+                            created_at: new Date().toISOString()
+                        });
+                        console.log("[Share] Created initial share record.");
                     }
                 } catch (err) {
-                    console.error("[Share] Ensure Share Exists Error:", err);
+                    console.error("[Share] Ensure Exists Error:", err);
                 }
             },
 
-            async updateShareData() {
-                if (!state.currentUser) return;
-                
-                console.log("[Share] Updating permanent share data...");
-                const payloadData = {
+            async updateShare(user) {
+                if (!user) return;
+                const appData = {
                     members: state.members || [],
                     expenses: state.expenses || [],
                     profile: state.userProfile || {}
                 };
-
+                
                 try {
-                    const { error } = await supabase.from('shares').upsert({
-                        id: state.currentUser.id,
-                        data: payloadData,
+                    const { error } = await supabase.from("shares").upsert({
+                        id: user.id,
+                        data: appData,
                         created_at: new Date().toISOString()
-                    }, { onConflict: 'id' });
-
+                    });
                     if (error) throw error;
-                    console.log("[Share] Data successfully synced to permanent share.");
+                    console.log("[Share] Record updated.");
                 } catch (err) {
                     console.error("[Share] Update Error:", err);
                 }
             },
 
-            getShareLink() {
-                if (!state.currentUser) return '';
-                return `${window.location.origin}${window.location.pathname}?share=${state.currentUser.id}`;
+            getShareLink(user) {
+                if (!user) return '';
+                return `${window.location.origin}${window.location.pathname}?share=${user.id}`;
             },
 
             copyShareLink() {
-                const shareUrl = this.getShareLink();
+                const shareUrl = this.getShareLink(state.currentUser);
                 if (!shareUrl) {
                     this.showToast("You must be logged in to copy the link", "error");
                     return;
@@ -762,7 +769,7 @@
             },
 
             async loadSharedData(shareId) {
-                console.log("[Share] Fetching Data from 'shares' table...");
+                console.log("Share ID:", shareId);
                 state.isSharedMode = true;
                 
                 try {
@@ -772,7 +779,8 @@
                         .eq("id", shareId)
                         .maybeSingle();
 
-                    if (error) throw error;
+                    console.log("Fetched Data:", data);
+                    if (error) console.error(error);
 
                     if (!data || !data.data) {
                         this.showSharedContainer();
@@ -782,18 +790,18 @@
                     }
 
                     this.showSharedContainer();
-                    this.renderPermanentSharedDashboard(data.data);
+                    this.renderSharedData(data.data);
                     this.hideGlobalLoader();
                     
                 } catch (err) {
-                    console.error("[Share] Fetch Error:", err);
+                    console.error("[Share] Load Error:", err);
                     this.showSharedContainer();
                     this.showShareError("Failed to load data", "An unexpected network or database error occurred.");
                     this.hideGlobalLoader();
                 }
             },
 
-            renderPermanentSharedDashboard(payload) {
+            renderSharedData(payload) {
                 try {
                     const { members, expenses, profile } = payload;
                     
@@ -936,8 +944,8 @@
                 
                 this.showAppContainer();
                 
-                this.loadData().then(() => {
-                    this.ensureShareExists();
+                this.loadData().then(async () => {
+                    await this.ensureShareExists(user);
                     this.showView('dashboard');
                     this.hideGlobalLoader();
                 });
@@ -1328,7 +1336,7 @@
                     const { error } = await supabase.from('expenses').update({ status: 'Paid' }).eq('id', expenseId);
                     if (error) throw error;
                     await this.loadData();
-                    await this.updateShareData();
+                    await this.updateShare(state.currentUser);
 
                     this.showToast("Expense cleared successfully", "success");
                     
@@ -1470,7 +1478,7 @@
                     if (expError) throw expError;
 
                     await this.loadData();
-                    await this.updateShareData();
+                    await this.updateShare(state.currentUser);
 
                     this.showToast("Expense split & saved successfully!", "success");
                     this.showView('dashboard');
@@ -1559,7 +1567,7 @@
                     
                     input.value = '';
                     await this.loadData();
-                    await this.updateShareData();
+                    await this.updateShare(state.currentUser);
 
                     this.showToast(`Added ${name} to team`, "success");
                     this.renderMembers();
@@ -1593,7 +1601,7 @@
                     await supabase.from('expenses').update({ member_name: newName.trim() }).eq('member_id', member.member_id);
 
                     await this.loadData();
-                    await this.updateShareData();
+                    await this.updateShare(state.currentUser);
 
                     this.showToast("Member updated successfully", "success");
                     this.renderMembers();
@@ -1610,7 +1618,7 @@
                     if (error) throw error;
                     
                     await this.loadData();
-                    await this.updateShareData();
+                    await this.updateShare(state.currentUser);
 
                     this.showToast("Member deleted successfully", "success");
                     this.renderMembers();
@@ -1774,7 +1782,7 @@
                 if (upiEl) upiEl.value = state.userProfile.upi_id || '';
                 
                 if (state.currentUser) {
-                    const shareUrl = this.getShareLink();
+                    const shareUrl = this.getShareLink(state.currentUser);
                     const slInput = $('share-link-input');
                     if (slInput) slInput.value = shareUrl;
                     const slOpen = $('share-link-open');
@@ -1803,7 +1811,7 @@
                         await supabase.from('user_profiles').insert({ user_id: state.currentUser.id, upi_id: upiId });
                     }
                     await this.loadData();
-                    await this.updateShareData();
+                    await this.updateShare(state.currentUser);
 
                     this.showToast("Settings saved successfully", "success");
                 } catch (err) {

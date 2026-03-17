@@ -769,13 +769,10 @@
             },
 
             async loadSharedData(shareId) {
-            console.log("Querying share id:", shareId); // ✅ ONLY HERE
-
-            state.isSharedMode = true;
-
-            document.getElementById("shared-container").style.display = "block";
-
-            try {
+                console.log("Share ID:", shareId);
+                state.isSharedMode = true;
+                
+                try {
                     const { data, error } = await supabase
                         .from("shares")
                         .select("*")

@@ -812,8 +812,14 @@
                     
                     if (!bill) throw new Error("Bill data not found locally");
 
-                    const shareId = crypto.randomUUID();
-                    console.log(`[Share] Created UUID: ${shareId}`);
+                    let shareId = localStorage.getItem(`share_${billId}`);
+                    if (!shareId) {
+                        shareId = crypto.randomUUID();
+                        localStorage.setItem(`share_${billId}`, shareId);
+                        console.log(`[Share] Created UUID: ${shareId}`);
+                    } else {
+                        console.log(`[Share] Reusing existing UUID: ${shareId}`);
+                    }
                     
                     // Set expiration to 7 days from now
                     const expiresAt = new Date();
@@ -824,14 +830,14 @@
                         expenses: expenses
                     };
 
-                    const { error } = await supabase.from('shares').insert({
+                    const { error } = await supabase.from('shares').upsert({
                         id: shareId,
                         data: payloadData,
                         expires_at: expiresAt.toISOString()
-                    });
+                    }, { onConflict: 'id' });
 
                     if (error) {
-                        console.error("[Share] Supabase Insert Error:", error);
+                        console.error("[Share] Supabase Upsert Error:", error);
                         throw error;
                     }
                     

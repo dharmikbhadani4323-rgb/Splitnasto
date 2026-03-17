@@ -769,132 +769,111 @@
             },
 
             async loadSharedData(shareId) {
-                console.log("Share ID:", shareId);
+    console.log("Share ID:", shareId);
 
-                state.isSharedMode = true;
+    state.isSharedMode = true;
 
-                document.getElementById("shared-container").style.display = "block";
+    document.getElementById("shared-container").style.display = "block";
 
-                try {
-                    const { data, error } = await supabase
-                        .from("shares")
-                        .select("*")
-                        .eq("id", shareId)
-                        .maybeSingle();
-
-                    console.log("Fetched Data:", data);
-
-                    if (error || !data || !data.data) {
-                        console.error("❌ Invalid Share Data");
-                        this.hideGlobalLoader(); // 🔥 IMPORTANT
-                        alert("Invalid Share Link");
-                        return;
-                    }
-
-                    this.renderSharedData(data.data);
-
-                } catch (err) {
-                    console.error("❌ Share Load Error:", err);
-                    alert("Something went wrong");
-                }
-
-                // 🔥 ALWAYS RUN
-                this.hideGlobalLoader();
-            },
-            
-async init() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const shareId = urlParams.get("share");
-
-    // 🔥 SHARE MODE
-    if (shareId) {
-        try {
-            await this.loadSharedData(shareId);
-        } catch (e) {
-            console.error("Share load error:", e);
-        }
-
-        // 🔥 SAFETY (loader atki na rahe)
-        this.hideGlobalLoader();
-        return;
-    }
-
-    // 🔥 AUTH CHECK
     try {
-        const { data: { user } } = await supabase.auth.getUser();
+        const { data, error } = await supabase
+            .from("shares")
+            .select("*")
+            .eq("id", shareId)
+            .maybeSingle();
 
-        if (user) {
-            await this.handleAuthSuccess(user);
-        } else {
-            document.getElementById("login-container").style.display = "flex";
+        console.log("Fetched Data:", data);
+
+        if (error || !data || !data.data) {
+            console.error("❌ Invalid Share Data");
+            alert("Invalid Share Link");
+            return;
         }
 
-    } catch (e) {
-        console.error("Init error:", e);
+        // 🔥 SAFE PAYLOAD
+        const payload = data.data || {};
+        payload.members = payload.members || [];
+        payload.expenses = payload.expenses || [];
+
+        try {
+            this.renderSharedData(payload);
+        } catch (e) {
+            console.error("Render error:", e);
+        }
+
+    } catch (err) {
+        console.error("❌ Share Load Error:", err);
     }
 
-    // 🔥 FINAL SAFETY (no infinite loader ever)
-    setTimeout(() => {
-        this.hideGlobalLoader();
-    }, 3000);
+    // 🔥 ALWAYS HIDE LOADER (NO MATTER WHAT)
+    this.hideGlobalLoader();
 },
+     
 
             renderSharedData(payload) {
-                try {
-                    const { members, expenses, profile } = payload;
-                    
-                    let totalPending = 0;
-                    const tbody = $('shared-tbody');
-                    if (!tbody) return;
-                    tbody.innerHTML = '';
+    const tbody = document.getElementById("shared-tbody");
+    if (!tbody) return;
 
-                    const stats = (members || []).map(m => {
-                        const mExps = (expenses || []).filter(e => e.member_id === m.member_id);
-                        const pending = mExps.filter(e => e.status === 'Pending').reduce((s, e) => s + Number(e.amount), 0);
-                        totalPending += pending;
-                        return { ...m, pending };
-                    }).filter(m => m.pending > 0).sort((a,b) => b.pending - a.pending);
+    tbody.innerHTML = "";
 
-                    const stpEl = $('shared-total-pending');
-                    if (stpEl) stpEl.textContent = `₹${totalPending.toFixed(2)}`;
+    let total = 0;
 
-                    if (stats.length === 0) {
-                        tbody.innerHTML = `<tr><td colspan="2" class="p-10 text-center text-emerald-600 font-bold bg-emerald-50/50 text-lg border-t border-emerald-100">🎉 All dues are cleared!</td></tr>`;
-                    } else {
-                        stats.forEach(m => {
-                            const avatarColor = this.getAvatarColor(m.name);
-                            const tr = document.createElement('tr');
-                            tr.innerHTML = `
-                                <td class="px-8 py-5 flex items-center gap-4">
-                                    <div class="w-12 h-12 rounded-2xl ${avatarColor} flex items-center justify-center font-bold text-lg shadow-sm border border-white/50">
-                                        ${m.name.charAt(0).toUpperCase()}
-                                    </div>
-                                    <span class="font-bold text-slate-800 text-lg">${m.name}</span>
-                                </td>
-                                <td class="px-8 py-5 text-right font-black text-orange-600 text-xl tracking-tight">₹${m.pending.toFixed(2)}</td>
-                            `;
-                            tbody.appendChild(tr);
-                        });
-                    }
+    (payload.members || []).forEach(m => {
+        const exps = (payload.expenses || []).filter(e => e.member_id === m.member_id);
 
-                    if (profile?.upi_id && totalPending > 0) {
-                        const spiEl = $('shared-payment-info');
-                        if (spiEl) spiEl.classList.remove('hidden');
-                        
-                        const suiEl = $('shared-upi-id');
-                        if (suiEl) suiEl.textContent = profile.upi_id;
-                        
-                        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=upi://pay?pa=${profile.upi_id}&pn=Admin`;
-                        const sqiEl = $('shared-qr-img');
-                        if (sqiEl) sqiEl.src = qrUrl;
-                    }
+        const pending = exps
+            .filter(e => e.status === "Pending")
+            .reduce((s, e) => s + Number(e.amount || 0), 0);
 
-                    setTimeout(() => lucide.createIcons(), 10);
-                } catch (err) {
-                    console.error("Error rendering permanent shared dashboard:", err);
-                    this.showShareError("Error", "Could not render the shared dashboard.");
-                }
-            },
+        if (pending > 0) {
+            total += pending;
+
+            tbody.innerHTML += `
+                <tr>
+                    <td>${m.name || '-'}</td>
+                    <td>₹${pending.toFixed(2)}</td>
+                </tr>
+            `;
+        }
+    });
+
+    const totalEl = document.getElementById("shared-total-pending");
+    if (totalEl) {
+        totalEl.innerText = `₹${total.toFixed(2)}`;
+    }
+},
+renderSharedData(payload) {
+    const tbody = document.getElementById("shared-tbody");
+    if (!tbody) return;
+
+    tbody.innerHTML = "";
+
+    let total = 0;
+
+    (payload.members || []).forEach(m => {
+        const exps = (payload.expenses || []).filter(e => e.member_id === m.member_id);
+
+        const pending = exps
+            .filter(e => e.status === "Pending")
+            .reduce((s, e) => s + Number(e.amount || 0), 0);
+
+        if (pending > 0) {
+            total += pending;
+
+            tbody.innerHTML += `
+                <tr>
+                    <td>${m.name || '-'}</td>
+                    <td>₹${pending.toFixed(2)}</td>
+                </tr>
+            `;
+        }
+    });
+
+    const totalEl = document.getElementById("shared-total-pending");
+    if (totalEl) {
+        totalEl.innerText = `₹${total.toFixed(2)}`;
+    }
+},
 
             showShareError(title, subtitle) {
                 const container = $('shared-container');

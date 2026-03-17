@@ -705,38 +705,49 @@
             async init() {
                 lucide.createIcons();
 
-                const params = new URLSearchParams(window.location.search);
-                const shareToken = params.get('share');
-                
-                if (shareToken) {
-                    state.isSharedMode = true;
-                    
-                    // SHARE FEATURE START
-                    try {
-                        console.log("[Init] Checking 'shares' table for token...");
-                        const { data: shareRecord } = await supabase
-                            .from('shares')
-                            .select('*')
-                            .eq('id', shareToken)
-                            .maybeSingle();
-                            
-                        if (shareRecord) {
-                            this.showSharedBillContainer();
-                            await this.loadSharedBillData(shareRecord);
-                            this.hideGlobalLoader();
-                            return; // Stop here, we handled the bill share
-                        }
-                    } catch (e) {
-                        console.error("Share table check failed", e);
-                    }
-                    // SHARE FEATURE END
-                    
-                    // Original fallback behavior for Team Dashboard shared links
-                    this.showSharedContainer();
-                    await this.loadSharedDashboard(shareToken);
-                    this.hideGlobalLoader();
-                    return;
-                }
+// SHARE FEATURE START
+
+const urlParams = new URLSearchParams(window.location.search);
+const shareId = urlParams.get("share");
+
+console.log("Share ID:", shareId);
+
+if (shareId) {
+  const loadShare = async () => {
+    const { data, error } = await supabase
+      .from("shares")
+      .select("*")
+      .eq("id", shareId)
+      .single();
+
+    console.log("Share data:", data);
+    console.log("Error:", error);
+
+    if (!data) {
+      document.body.innerHTML = `
+        <h2 style="text-align:center;margin-top:50px;color:red;">
+          Invalid or Expired Link
+        </h2>
+      `;
+      return;
+    }
+
+    const { data: bill } = await supabase
+      .from("bills")
+      .select("*")
+      .eq("id", data.bill_id)
+      .single();
+
+    console.log("Bill:", bill);
+
+    // TODO: show bill data in UI
+  };
+
+  loadShare();
+  return;
+}
+
+// SHARE FEATURE END
 
                 try {
                     const { data: { user }, error } = await supabase.auth.getUser();

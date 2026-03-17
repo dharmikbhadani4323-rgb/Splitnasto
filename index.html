@@ -301,7 +301,6 @@
                                         <th class="px-6 py-4">Item</th>
                                         <th class="px-6 py-4">Amount</th>
                                         <th class="px-6 py-4">Status</th>
-                                        <th class="px-6 py-4 text-center">Action</th>
                                     </tr>
                                 </thead>
                                 <tbody id="reports-tbody" class="divide-y divide-slate-100/80 bg-white">
@@ -438,18 +437,15 @@
                             </div>
 
                             <div class="flex flex-col gap-4 mt-auto">
-                                <div id="share-link-container" class="hidden bg-slate-50 border border-slate-200 rounded-xl p-1.5 flex items-center gap-1">
+                                <div id="share-link-container" class="bg-slate-50 border border-slate-200 rounded-xl p-1.5 flex items-center gap-1">
                                     <input type="text" id="share-link-input" readonly class="flex-1 bg-transparent border-none focus:ring-0 text-sm font-medium text-slate-600 px-3 outline-none truncate">
-                                    <button onclick="app.copyShareLink()" class="p-2.5 bg-white border border-slate-200 hover:bg-slate-100 rounded-lg text-slate-600 transition-colors shadow-sm active:scale-95" title="Copy">
-                                        <i data-lucide="copy" class="w-4 h-4"></i>
-                                    </button>
                                     <a id="share-link-open" href="#" target="_blank" class="p-2.5 bg-white border border-slate-200 hover:bg-slate-100 rounded-lg text-slate-600 transition-colors shadow-sm active:scale-95" title="Open Link">
                                         <i data-lucide="external-link" class="w-4 h-4"></i>
                                     </a>
                                 </div>
                                 
-                                <button onclick="app.generateShareLink()" class="w-full bg-white border border-slate-200 text-slate-700 py-3.5 rounded-xl font-semibold hover:bg-slate-50 shadow-sm transition-all active:scale-[0.98] flex items-center justify-center gap-2">
-                                    <i data-lucide="link" class="w-4 h-4"></i> <span id="share-btn-text">Generate Share Link</span>
+                                <button onclick="app.copyShareLink()" class="w-full bg-white border border-slate-200 text-slate-700 py-3.5 rounded-xl font-semibold hover:bg-slate-50 shadow-sm transition-all active:scale-[0.98] flex items-center justify-center gap-2">
+                                    <i data-lucide="copy" class="w-4 h-4"></i> <span>Copy Share Link</span>
                                 </button>
                             </div>
                         </div>
@@ -507,13 +503,6 @@
             </div>
         </div>
     </div>
-
-    <!-- SHARE FEATURE START -->
-    <!-- INDIVIDUAL SHARED BILL (PUBLIC) -->
-    <div id="shared-bill-container" class="w-full min-h-screen bg-[#F8FAFC]" style="display: none;">
-        <!-- Dynamic content injected here -->
-    </div>
-    <!-- SHARE FEATURE END -->
 
     <!-- MEMBER DETAIL MODAL -->
     <div id="member-detail-modal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100] hidden items-center justify-center p-4">
@@ -630,48 +619,21 @@
         };
 
         window.app = {
-            // Container Toggles
             showAppContainer() {
-                const appCont = $('app-container');
-                if (appCont) appCont.style.display = 'flex';
-                const logCont = $('login-container');
-                if (logCont) logCont.style.display = 'none';
-                const shrCont = $('shared-container');
-                if (shrCont) shrCont.style.display = 'none';
-                const sBillCont = $('shared-bill-container'); // SHARE FEATURE
-                if (sBillCont) sBillCont.style.display = 'none'; // SHARE FEATURE
-            },
-            showLoginContainer() {
-                const appCont = $('app-container');
-                if (appCont) appCont.style.display = 'none';
-                const logCont = $('login-container');
-                if (logCont) logCont.style.display = 'flex';
-                const shrCont = $('shared-container');
-                if (shrCont) shrCont.style.display = 'none';
-                const sBillCont = $('shared-bill-container'); // SHARE FEATURE
-                if (sBillCont) sBillCont.style.display = 'none'; // SHARE FEATURE
-            },
-            showSharedContainer() {
-                const appCont = $('app-container');
-                if (appCont) appCont.style.display = 'none';
-                const logCont = $('login-container');
-                if (logCont) logCont.style.display = 'none';
-                const shrCont = $('shared-container');
-                if (shrCont) shrCont.style.display = 'block';
-                const sBillCont = $('shared-bill-container'); // SHARE FEATURE
-                if (sBillCont) sBillCont.style.display = 'none'; // SHARE FEATURE
-            },
-            
-            // SHARE FEATURE START
-            showSharedBillContainer() {
-                const appCont = $('app-container'); if (appCont) appCont.style.display = 'none';
+                const appCont = $('app-container'); if (appCont) appCont.style.display = 'flex';
                 const logCont = $('login-container'); if (logCont) logCont.style.display = 'none';
                 const shrCont = $('shared-container'); if (shrCont) shrCont.style.display = 'none';
-                
-                let sbCont = $('shared-bill-container');
-                if (sbCont) sbCont.style.display = 'flex';
             },
-            // SHARE FEATURE END
+            showLoginContainer() {
+                const appCont = $('app-container'); if (appCont) appCont.style.display = 'none';
+                const logCont = $('login-container'); if (logCont) logCont.style.display = 'flex';
+                const shrCont = $('shared-container'); if (shrCont) shrCont.style.display = 'none';
+            },
+            showSharedContainer() {
+                const appCont = $('app-container'); if (appCont) appCont.style.display = 'none';
+                const logCont = $('login-container'); if (logCont) logCont.style.display = 'none';
+                let shrCont = $('shared-container'); if (shrCont) shrCont.style.display = 'block';
+            },
 
             hideGlobalLoader() {
                 const loader = $('global-loader');
@@ -704,73 +666,13 @@
             async init() {
                 lucide.createIcons();
 
-                // SHARE FEATURE START
                 const urlParams = new URLSearchParams(window.location.search);
                 const shareId = urlParams.get("share");
 
                 if (shareId) {
-                    console.log("[Share] Share ID detected:", shareId);
-                    state.isSharedMode = true;
-
-                    const loadShare = async () => {
-                        try {
-                            if (shareId.length === 36) {
-                                console.log("[Share] Fetching data from 'shares' table...");
-                                
-                                // Fetching using maybeSingle to avoid errors if no rows found
-                                const { data, error } = await supabase
-                                    .from("shares")
-                                    .select("*")
-                                    .eq("id", shareId)
-                                    .maybeSingle();
-
-                                console.log("[Share] Fetched Data:", data);
-                                if (error) console.error("[Share] Fetch Error:", error);
-
-                                if (!data || !data.data) {
-                                    console.warn("[Share] Data not found or invalid.");
-                                    app.showSharedBillContainer();
-                                    app.showShareError("Invalid Link", "This share link does not exist or has been removed.");
-                                    app.hideGlobalLoader();
-                                    return;
-                                }
-
-                                // Expiration Check
-                                if (data.expires_at) {
-                                    const expiryDate = new Date(data.expires_at);
-                                    if (new Date() > expiryDate) {
-                                        console.warn("[Share] Link has expired.");
-                                        app.showSharedBillContainer();
-                                        app.showShareError("Link Expired", "This share link has expired and is no longer valid.");
-                                        app.hideGlobalLoader();
-                                        return;
-                                    }
-                                }
-
-                                console.log("[Share] Valid JSON payload found, rendering UI.");
-                                app.showSharedBillContainer();
-                                app.renderSharedBill(data.data);
-                                app.hideGlobalLoader();
-                                return;
-                            }
-                            
-                            // Original fallback mechanism for Dashboard tokens
-                            app.showSharedContainer();
-                            await app.loadSharedDashboard(shareId);
-                            app.hideGlobalLoader();
-                            
-                        } catch (err) {
-                            console.error("[Share] Exception during share load:", err);
-                            app.showSharedBillContainer();
-                            app.showShareError("Failed to load data", "An unexpected error occurred while loading the link.");
-                            app.hideGlobalLoader();
-                        }
-                    };
-
-                    loadShare();
-                    return; // Prevent normal login flow
+                    this.loadSharedData(shareId);
+                    return; 
                 }
-                // SHARE FEATURE END
 
                 try {
                     const { data: { user }, error } = await supabase.auth.getUser();
@@ -802,114 +704,156 @@
                 }
             },
 
-            // SHARE FEATURE START
-            async generateBillShareLink(billId) {
-                console.log(`[Share] Generating link for bill: ${billId}`);
+            async ensureShareExists() {
+                if (!state.currentUser) return;
                 try {
-                    // Fetch full data from local state to save into JSON
-                    const bill = state.bills.find(b => b.id === billId);
-                    const expenses = state.expenses.filter(e => e.bill_id === billId);
+                    const { data, error } = await supabase.from('shares').select('id').eq('id', state.currentUser.id).maybeSingle();
+                    if (error) throw error;
                     
-                    if (!bill) throw new Error("Bill data not found locally");
-
-                    let shareId = localStorage.getItem(`share_${billId}`);
-                    if (!shareId) {
-                        shareId = crypto.randomUUID();
-                        localStorage.setItem(`share_${billId}`, shareId);
-                        console.log(`[Share] Created UUID: ${shareId}`);
-                    } else {
-                        console.log(`[Share] Reusing existing UUID: ${shareId}`);
+                    if (!data) {
+                        await this.updateShareData();
                     }
-                    
-                    // Set expiration to 7 days from now
-                    const expiresAt = new Date();
-                    expiresAt.setDate(expiresAt.getDate() + 7);
-                    
-                    const payloadData = {
-                        bill: bill,
-                        expenses: expenses
-                    };
-
-                    const { error } = await supabase.from('shares').upsert({
-                        id: shareId,
-                        data: payloadData,
-                        expires_at: expiresAt.toISOString()
-                    }, { onConflict: 'id' });
-
-                    if (error) {
-                        console.error("[Share] Supabase Upsert Error:", error);
-                        throw error;
-                    }
-                    
-                    const shareUrl = `${window.location.origin}${window.location.pathname}?share=${shareId}`;
-                    console.log(`[Share] Link generated successfully: ${shareUrl}`);
-
-                    await navigator.clipboard.writeText(shareUrl);
-                    this.showToast("Bill Share Link copied to clipboard!", "success");
-
                 } catch (err) {
-                    console.error("[Share] Error generating link:", err);
-                    this.showToast("Failed to generate share link", "error");
+                    console.error("[Share] Ensure Share Exists Error:", err);
                 }
             },
 
-            renderSharedBill(payload) {
-                const sbCont = $('shared-bill-container');
-                if (!sbCont) return;
+            async updateShareData() {
+                if (!state.currentUser) return;
+                
+                console.log("[Share] Updating permanent share data...");
+                const payloadData = {
+                    members: state.members || [],
+                    expenses: state.expenses || [],
+                    profile: state.userProfile || {}
+                };
 
                 try {
-                    const { bill, expenses } = payload;
-                    
-                    let expensesHtml = expenses.map(exp => `
-                        <div class="flex justify-between items-center py-3 border-b border-slate-100 last:border-0">
-                            <div class="flex items-center gap-3">
-                                <div class="w-8 h-8 rounded-full bg-brand-50 text-brand-600 flex items-center justify-center font-bold text-xs shadow-sm border border-white/50">
-                                    ${exp.member_name.charAt(0).toUpperCase()}
-                                </div>
-                                <span class="font-medium text-slate-700 text-sm">${exp.member_name}</span>
-                            </div>
-                            <div class="text-right">
-                                <span class="font-bold text-slate-800 text-sm">₹${Number(exp.amount).toFixed(2)}</span>
-                                <div class="text-[10px] font-bold uppercase tracking-wider mt-0.5 ${exp.status === 'Paid' ? 'text-emerald-500' : 'text-orange-500'}">${exp.status}</div>
-                            </div>
-                        </div>
-                    `).join('');
+                    const { error } = await supabase.from('shares').upsert({
+                        id: state.currentUser.id,
+                        data: payloadData,
+                        created_at: new Date().toISOString()
+                    }, { onConflict: 'id' });
 
-                    sbCont.innerHTML = `
-                        <div class="flex flex-col items-center justify-center min-h-screen w-full bg-[#F8FAFC] p-4">
-                            <div class="bg-white p-6 sm:p-8 rounded-[24px] shadow-float max-w-md w-full border border-slate-200/60 animate-in fade-in zoom-in-95 duration-500">
-                                <div class="text-center mb-6">
-                                    <div class="bg-gradient-to-br from-brand-500 to-purple-600 w-14 h-14 rounded-[16px] flex items-center justify-center mx-auto mb-4 shadow-lg shadow-brand-500/30">
-                                        <i data-lucide="receipt" class="w-7 h-7 text-white"></i>
-                                    </div>
-                                    <h2 class="text-2xl font-bold text-slate-900 tracking-tight">${bill.item}</h2>
-                                    <p class="text-slate-500 mt-1 text-sm font-medium">${new Date(bill.date).toLocaleDateString()} • ${bill.time}</p>
-                                </div>
-                                
-                                <div class="bg-slate-50 rounded-xl p-4 mb-6 border border-slate-100 text-center">
-                                    <p class="text-xs text-slate-400 font-bold uppercase tracking-wider mb-1">Total Bill Amount</p>
-                                    <p class="text-3xl font-black text-slate-800 tracking-tight">₹${Number(bill.total_amount).toFixed(2)}</p>
-                                </div>
-
-                                <div>
-                                    <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 px-1">Split Details</h3>
-                                    <div class="bg-white border border-slate-100 rounded-xl px-4 shadow-sm max-h-64 overflow-y-auto">
-                                        ${expensesHtml}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                    lucide.createIcons();
+                    if (error) throw error;
+                    console.log("[Share] Data successfully synced to permanent share.");
                 } catch (err) {
-                    console.error("Error rendering shared bill data:", err);
-                    this.showShareError("Error", "Could not render the bill details.");
+                    console.error("[Share] Update Error:", err);
+                }
+            },
+
+            getShareLink() {
+                if (!state.currentUser) return '';
+                return `${window.location.origin}${window.location.pathname}?share=${state.currentUser.id}`;
+            },
+
+            copyShareLink() {
+                const shareUrl = this.getShareLink();
+                if (!shareUrl) {
+                    this.showToast("You must be logged in to copy the link", "error");
+                    return;
+                }
+                navigator.clipboard.writeText(shareUrl).then(() => {
+                    this.showToast("Share link copied to clipboard!", "success");
+                }).catch(err => {
+                    console.error("[Share] Copy failed", err);
+                    this.showToast("Failed to copy link", "error");
+                });
+            },
+
+            async loadSharedData(shareId) {
+                console.log("[Share] Fetching Data from 'shares' table...");
+                state.isSharedMode = true;
+                
+                try {
+                    const { data, error } = await supabase
+                        .from("shares")
+                        .select("*")
+                        .eq("id", shareId)
+                        .maybeSingle();
+
+                    if (error) throw error;
+
+                    if (!data || !data.data) {
+                        this.showSharedContainer();
+                        this.showShareError("Invalid Link", "This share link does not exist or has been removed.");
+                        this.hideGlobalLoader();
+                        return;
+                    }
+
+                    this.showSharedContainer();
+                    this.renderPermanentSharedDashboard(data.data);
+                    this.hideGlobalLoader();
+                    
+                } catch (err) {
+                    console.error("[Share] Fetch Error:", err);
+                    this.showSharedContainer();
+                    this.showShareError("Failed to load data", "An unexpected network or database error occurred.");
+                    this.hideGlobalLoader();
+                }
+            },
+
+            renderPermanentSharedDashboard(payload) {
+                try {
+                    const { members, expenses, profile } = payload;
+                    
+                    let totalPending = 0;
+                    const tbody = $('shared-tbody');
+                    if (!tbody) return;
+                    tbody.innerHTML = '';
+
+                    const stats = (members || []).map(m => {
+                        const mExps = (expenses || []).filter(e => e.member_id === m.member_id);
+                        const pending = mExps.filter(e => e.status === 'Pending').reduce((s, e) => s + Number(e.amount), 0);
+                        totalPending += pending;
+                        return { ...m, pending };
+                    }).filter(m => m.pending > 0).sort((a,b) => b.pending - a.pending);
+
+                    const stpEl = $('shared-total-pending');
+                    if (stpEl) stpEl.textContent = `₹${totalPending.toFixed(2)}`;
+
+                    if (stats.length === 0) {
+                        tbody.innerHTML = `<tr><td colspan="2" class="p-10 text-center text-emerald-600 font-bold bg-emerald-50/50 text-lg border-t border-emerald-100">🎉 All dues are cleared!</td></tr>`;
+                    } else {
+                        stats.forEach(m => {
+                            const avatarColor = this.getAvatarColor(m.name);
+                            const tr = document.createElement('tr');
+                            tr.innerHTML = `
+                                <td class="px-8 py-5 flex items-center gap-4">
+                                    <div class="w-12 h-12 rounded-2xl ${avatarColor} flex items-center justify-center font-bold text-lg shadow-sm border border-white/50">
+                                        ${m.name.charAt(0).toUpperCase()}
+                                    </div>
+                                    <span class="font-bold text-slate-800 text-lg">${m.name}</span>
+                                </td>
+                                <td class="px-8 py-5 text-right font-black text-orange-600 text-xl tracking-tight">₹${m.pending.toFixed(2)}</td>
+                            `;
+                            tbody.appendChild(tr);
+                        });
+                    }
+
+                    if (profile?.upi_id && totalPending > 0) {
+                        const spiEl = $('shared-payment-info');
+                        if (spiEl) spiEl.classList.remove('hidden');
+                        
+                        const suiEl = $('shared-upi-id');
+                        if (suiEl) suiEl.textContent = profile.upi_id;
+                        
+                        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=upi://pay?pa=${profile.upi_id}&pn=Admin`;
+                        const sqiEl = $('shared-qr-img');
+                        if (sqiEl) sqiEl.src = qrUrl;
+                    }
+
+                    setTimeout(() => lucide.createIcons(), 10);
+                } catch (err) {
+                    console.error("Error rendering permanent shared dashboard:", err);
+                    this.showShareError("Error", "Could not render the shared dashboard.");
                 }
             },
 
             showShareError(title, subtitle) {
-                const container = $('shared-bill-container');
+                const container = $('shared-container');
                 if (!container) return;
+                container.style.display = 'block';
                 container.innerHTML = `
                     <div class="flex flex-col items-center justify-center min-h-screen w-full bg-[#F8FAFC] p-4">
                         <div class="bg-white p-8 rounded-2xl shadow-soft text-center max-w-sm w-full border border-slate-200 animate-in fade-in zoom-in-95">
@@ -923,7 +867,6 @@
                 `;
                 lucide.createIcons();
             },
-            // SHARE FEATURE END
 
             async loginWithGoogle() {
                 try {
@@ -994,6 +937,7 @@
                 this.showAppContainer();
                 
                 this.loadData().then(() => {
+                    this.ensureShareExists();
                     this.showView('dashboard');
                     this.hideGlobalLoader();
                 });
@@ -1100,6 +1044,7 @@
                     state.bills = billRes.data || [];
                     state.expenses = expRes.data || [];
                     state.userProfile = profRes.data || { upi_id: '' };
+
                 } catch (err) {
                     console.error("Data Sync Error:", err);
                     this.showToast("Failed to sync data", "error");
@@ -1383,6 +1328,8 @@
                     const { error } = await supabase.from('expenses').update({ status: 'Paid' }).eq('id', expenseId);
                     if (error) throw error;
                     await this.loadData();
+                    await this.updateShareData();
+
                     this.showToast("Expense cleared successfully", "success");
                     
                     if (state.selectedMemberId) {
@@ -1523,6 +1470,8 @@
                     if (expError) throw expError;
 
                     await this.loadData();
+                    await this.updateShareData();
+
                     this.showToast("Expense split & saved successfully!", "success");
                     this.showView('dashboard');
                 } catch (err) {
@@ -1610,6 +1559,8 @@
                     
                     input.value = '';
                     await this.loadData();
+                    await this.updateShareData();
+
                     this.showToast(`Added ${name} to team`, "success");
                     this.renderMembers();
                 } catch (err) {
@@ -1642,6 +1593,8 @@
                     await supabase.from('expenses').update({ member_name: newName.trim() }).eq('member_id', member.member_id);
 
                     await this.loadData();
+                    await this.updateShareData();
+
                     this.showToast("Member updated successfully", "success");
                     this.renderMembers();
                 } catch (err) {
@@ -1657,6 +1610,8 @@
                     if (error) throw error;
                     
                     await this.loadData();
+                    await this.updateShareData();
+
                     this.showToast("Member deleted successfully", "success");
                     this.renderMembers();
                 } catch (err) {
@@ -1751,13 +1706,6 @@
                                 ${e.status}
                             </span>
                         </td>
-                        <!-- SHARE FEATURE START -->
-                        <td class="px-6 py-4 text-center">
-                            <button onclick="app.generateBillShareLink('${e.bill_id}')" class="p-2 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors" title="Share Bill">
-                                <i data-lucide="share-2" class="w-4 h-4"></i>
-                            </button>
-                        </td>
-                        <!-- SHARE FEATURE END -->
                     `;
                     tbody.appendChild(tr);
                 });
@@ -1825,19 +1773,13 @@
                 const upiEl = $('upi-id-input');
                 if (upiEl) upiEl.value = state.userProfile.upi_id || '';
                 
-                supabase.from('shared_links').select('token').eq('user_id', state.currentUser.id).maybeSingle().then(({data}) => {
-                    if (data) {
-                        const url = `${window.location.origin}${window.location.pathname}?share=${data.token}`;
-                        const slInput = $('share-link-input');
-                        if (slInput) slInput.value = url;
-                        const slOpen = $('share-link-open');
-                        if (slOpen) slOpen.href = url;
-                        const slCont = $('share-link-container');
-                        if (slCont) slCont.classList.remove('hidden');
-                        const sBtnTxt = $('share-btn-text');
-                        if (sBtnTxt) sBtnTxt.innerHTML = 'Regenerate Link';
-                    }
-                });
+                if (state.currentUser) {
+                    const shareUrl = this.getShareLink();
+                    const slInput = $('share-link-input');
+                    if (slInput) slInput.value = shareUrl;
+                    const slOpen = $('share-link-open');
+                    if (slOpen) slOpen.href = shareUrl;
+                }
             },
 
             async saveProfile() {
@@ -1861,6 +1803,8 @@
                         await supabase.from('user_profiles').insert({ user_id: state.currentUser.id, upi_id: upiId });
                     }
                     await this.loadData();
+                    await this.updateShareData();
+
                     this.showToast("Settings saved successfully", "success");
                 } catch (err) {
                     this.showToast(err.message, "error");
@@ -1868,102 +1812,6 @@
                     if (btn) {
                         btn.disabled = false;
                         btn.innerHTML = origHtml;
-                        lucide.createIcons();
-                    }
-                }
-            },
-
-            async generateShareLink() {
-                try {
-                    const { data: existing } = await supabase.from('shared_links').select('token').eq('user_id', state.currentUser.id).maybeSingle();
-                    let token = existing ? existing.token : crypto.randomUUID();
-                    
-                    if (!existing) {
-                        await supabase.from('shared_links').insert({ user_id: state.currentUser.id, token: token });
-                    }
-                    
-                    const url = `${window.location.origin}${window.location.pathname}?share=${token}`;
-                    const slInput = $('share-link-input');
-                    if (slInput) slInput.value = url;
-                    const slOpen = $('share-link-open');
-                    if (slOpen) slOpen.href = url;
-                    const slCont = $('share-link-container');
-                    if (slCont) slCont.classList.remove('hidden');
-                    const sBtnTxt = $('share-btn-text');
-                    if (sBtnTxt) sBtnTxt.textContent = 'Regenerate Link';
-                    this.showToast("Public link generated", "success");
-                } catch (err) {
-                    this.showToast(err.message, "error");
-                }
-            },
-
-            copyShareLink() {
-                const input = $('share-link-input');
-                if (input) {
-                    input.select();
-                    document.execCommand('copy');
-                    this.showToast("Link copied to clipboard", "success");
-                }
-            },
-
-            async loadSharedDashboard(token) {
-                try {
-                    const { data, error } = await supabase.rpc('get_shared_dashboard', { p_token: token });
-                    if (error || !data) throw new Error("Invalid or Expired Link");
-
-                    const { members, expenses, profile } = data;
-                    
-                    let totalPending = 0;
-                    const tbody = $('shared-tbody');
-                    if (!tbody) return;
-                    tbody.innerHTML = '';
-
-                    const stats = members.map(m => {
-                        const mExps = expenses.filter(e => e.member_id === m.member_id);
-                        const pending = mExps.filter(e => e.status === 'Pending').reduce((s, e) => s + Number(e.amount), 0);
-                        totalPending += pending;
-                        return { ...m, pending };
-                    }).filter(m => m.pending > 0).sort((a,b) => b.pending - a.pending);
-
-                    const stpEl = $('shared-total-pending');
-                    if (stpEl) stpEl.textContent = `₹${totalPending.toFixed(2)}`;
-
-                    if (stats.length === 0) {
-                        tbody.innerHTML = `<tr><td colspan="2" class="p-10 text-center text-emerald-600 font-bold bg-emerald-50/50 text-lg border-t border-emerald-100">🎉 All dues are cleared!</td></tr>`;
-                    } else {
-                        stats.forEach(m => {
-                            const avatarColor = this.getAvatarColor(m.name);
-                            const tr = document.createElement('tr');
-                            tr.innerHTML = `
-                                <td class="px-8 py-5 flex items-center gap-4">
-                                    <div class="w-12 h-12 rounded-2xl ${avatarColor} flex items-center justify-center font-bold text-lg shadow-sm border border-white/50">
-                                        ${m.name.charAt(0).toUpperCase()}
-                                    </div>
-                                    <span class="font-bold text-slate-800 text-lg">${m.name}</span>
-                                </td>
-                                <td class="px-8 py-5 text-right font-black text-orange-600 text-xl tracking-tight">₹${m.pending.toFixed(2)}</td>
-                            `;
-                            tbody.appendChild(tr);
-                        });
-                    }
-
-                    if (profile?.upi_id && totalPending > 0) {
-                        const spiEl = $('shared-payment-info');
-                        if (spiEl) spiEl.classList.remove('hidden');
-                        
-                        const suiEl = $('shared-upi-id');
-                        if (suiEl) suiEl.textContent = profile.upi_id;
-                        
-                        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=upi://pay?pa=${profile.upi_id}&pn=Admin`;
-                        const sqiEl = $('shared-qr-img');
-                        if (sqiEl) sqiEl.src = qrUrl;
-                    }
-
-                    setTimeout(() => lucide.createIcons(), 10);
-                } catch (err) {
-                    const sc = $('shared-container');
-                    if (sc) {
-                        sc.innerHTML = `<div class="flex flex-col items-center justify-center min-h-[60vh]"><div class="p-4 bg-red-50 text-red-600 rounded-2xl font-semibold border border-red-100 flex items-center gap-2"><i data-lucide="alert-circle"></i> ${err.message}</div></div>`;
                         lucide.createIcons();
                     }
                 }

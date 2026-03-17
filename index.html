@@ -1,0 +1,1766 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SnackSync - Premium Expense Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: {
+                        brand: { 50: '#eef2ff', 100: '#e0e7ff', 500: '#6366f1', 600: '#4f46e5', 700: '#4338ca', 900: '#312e81' },
+                    },
+                    boxShadow: {
+                        'soft': '0 4px 20px -2px rgba(0, 0, 0, 0.05)',
+                        'float': '0 10px 30px -5px rgba(0, 0, 0, 0.08)',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .hidden-view { display: none !important; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        .modal-enter { opacity: 1; transform: scale(1) translateY(0); }
+        .modal-exit { opacity: 0; transform: scale(0.98) translateY(10px); pointer-events: none; }
+        
+        @keyframes slideInDown {
+            from { transform: translateY(-100%) translateX(-50%); opacity: 0; }
+            to { transform: translateY(0) translateX(-50%); opacity: 1; }
+        }
+        @keyframes slideOutUp {
+            from { transform: translateY(0) translateX(-50%); opacity: 1; }
+            to { transform: translateY(-100%) translateX(-50%); opacity: 0; }
+        }
+        .toast-enter { animation: slideInDown 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        .toast-exit { animation: slideOutUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+
+        input[type="date"]::-webkit-calendar-picker-indicator,
+        input[type="time"]::-webkit-calendar-picker-indicator { cursor: pointer; opacity: 0.6; transition: 0.2s; }
+        input[type="date"]::-webkit-calendar-picker-indicator:hover,
+        input[type="time"]::-webkit-calendar-picker-indicator:hover { opacity: 1; }
+    </style>
+</head>
+<body class="bg-[#F8FAFC] text-slate-800 antialiased selection:bg-brand-500 selection:text-white flex overflow-hidden h-screen">
+
+    <!-- GLOBAL LOADER -->
+    <div id="global-loader" class="fixed inset-0 bg-white/90 backdrop-blur-sm z-[200] flex flex-col items-center justify-center transition-opacity duration-700">
+        <div class="relative flex items-center justify-center w-24 h-24 mb-6">
+            <div class="absolute inset-0 rounded-full border-[3px] border-slate-100"></div>
+            <div class="absolute inset-0 rounded-full border-[3px] border-brand-600 border-t-transparent animate-spin"></div>
+            <div class="w-12 h-12 bg-brand-50 rounded-full flex items-center justify-center">
+                <i data-lucide="zap" class="w-6 h-6 text-brand-600 animate-pulse"></i>
+            </div>
+        </div>
+        <h2 class="text-xl font-bold text-slate-800 tracking-tight">Loading SnackSync</h2>
+        <p class="text-sm text-slate-500 font-medium mt-1">Preparing your workspace...</p>
+    </div>
+
+    <!-- TOAST CONTAINER -->
+    <div id="toast-container" class="fixed top-6 left-1/2 -translate-x-1/2 z-[300] flex flex-col gap-3 pointer-events-none w-full max-w-sm px-4 items-center"></div>
+
+    <!-- LOGIN CONTAINER -->
+    <div id="login-container" class="w-full h-screen flex items-center justify-center p-4 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-brand-50 via-[#F8FAFC] to-[#F8FAFC]" style="display: none;">
+        <div class="bg-white p-8 sm:p-12 rounded-[24px] shadow-float border border-slate-200/60 max-w-[420px] w-full animate-in zoom-in-95 duration-700 fade-in">
+            <div class="text-center mb-8">
+                <div class="bg-gradient-to-br from-brand-500 to-purple-600 w-16 h-16 rounded-[18px] flex items-center justify-center mx-auto mb-6 shadow-lg shadow-brand-500/30">
+                    <i data-lucide="pie-chart" class="w-8 h-8 text-white"></i>
+                </div>
+                <h2 class="text-2xl font-bold text-slate-900 tracking-tight">Welcome back</h2>
+                <p class="text-slate-500 mt-2 text-sm font-medium">Enter your details to access your workspace.</p>
+            </div>
+            
+            <div id="auth-error" class="hidden mb-6 p-4 bg-red-50/80 border border-red-100 text-red-600 rounded-2xl text-sm text-center font-medium"></div>
+
+            <button type="button" onclick="app.loginWithGoogle()" class="w-full bg-white border border-slate-200 text-slate-700 py-3 rounded-2xl font-semibold hover:bg-slate-50 transition-all flex items-center justify-center gap-3 mb-6 shadow-sm hover:shadow active:scale-[0.98]">
+                <svg class="w-5 h-5" viewBox="0 0 24 24"><path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+                Continue with Google
+            </button>
+
+            <div class="flex items-center gap-4 mb-6">
+                <div class="h-px bg-slate-200 flex-1"></div>
+                <span class="text-xs text-slate-400 font-semibold uppercase tracking-wider">Or email</span>
+                <div class="h-px bg-slate-200 flex-1"></div>
+            </div>
+
+            <form id="auth-form" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1.5">Email address</label>
+                    <input type="email" id="email" required class="w-full border border-slate-200 p-3 rounded-2xl focus:ring-4 focus:ring-brand-500/10 focus:border-brand-500 outline-none transition-all placeholder:text-slate-400" placeholder="you@company.com">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1.5">Password</label>
+                    <input type="password" id="password" required class="w-full border border-slate-200 p-3 rounded-2xl focus:ring-4 focus:ring-brand-500/10 focus:border-brand-500 outline-none transition-all placeholder:text-slate-400" placeholder="••••••••">
+                </div>
+                <div class="pt-2 flex flex-col gap-3">
+                    <button type="button" onclick="app.login()" class="w-full bg-brand-600 text-white py-3 rounded-2xl font-semibold hover:bg-brand-700 shadow-lg shadow-brand-500/25 transition-all active:scale-[0.98]">Sign In</button>
+                    <button type="button" onclick="app.signup()" class="w-full bg-white border border-slate-200 text-slate-600 py-3 rounded-2xl font-semibold hover:bg-slate-50 transition-all active:scale-[0.98]">Create Account</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- APP CONTAINER -->
+    <div id="app-container" class="w-full h-full flex relative" style="display: none;">
+        
+        <!-- MOBILE OVERLAY -->
+        <div id="mobile-overlay" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40 hidden lg:hidden transition-opacity duration-300" onclick="app.toggleSidebar()"></div>
+
+        <!-- LEFT SIDEBAR -->
+        <aside id="sidebar" class="fixed lg:static inset-y-0 left-0 z-50 w-64 bg-[#0B0F19] text-slate-300 transition-transform transform -translate-x-full lg:translate-x-0 flex flex-col duration-300 ease-in-out border-r border-slate-800/50">
+            <div class="h-16 flex items-center px-6 border-b border-slate-800/50">
+                <div class="flex items-center gap-3">
+                    <div class="bg-gradient-to-br from-brand-500 to-purple-500 p-1.5 rounded-lg shadow-lg shadow-brand-500/20">
+                        <i data-lucide="pie-chart" class="w-5 h-5 text-white"></i>
+                    </div>
+                    <span class="font-bold text-lg text-white tracking-tight">SnackSync</span>
+                </div>
+            </div>
+
+            <nav class="flex-1 px-3 py-6 space-y-1 overflow-y-auto">
+                <p class="px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-4">Workspace</p>
+                <button onclick="app.showView('dashboard')" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium transition-all hover:bg-white/5 hover:text-white group">
+                    <i data-lucide="layout-dashboard" class="w-5 h-5 text-slate-400 group-hover:text-white transition-colors"></i> Dashboard
+                </button>
+                <button onclick="app.showView('add-bill')" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium transition-all hover:bg-white/5 hover:text-white group">
+                    <i data-lucide="receipt" class="w-5 h-5 text-slate-400 group-hover:text-white transition-colors"></i> Add Bill
+                </button>
+                <button onclick="app.showView('members')" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium transition-all hover:bg-white/5 hover:text-white group">
+                    <i data-lucide="users" class="w-5 h-5 text-slate-400 group-hover:text-white transition-colors"></i> Members
+                </button>
+                <button onclick="app.showView('reports')" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium transition-all hover:bg-white/5 hover:text-white group">
+                    <i data-lucide="bar-chart-2" class="w-5 h-5 text-slate-400 group-hover:text-white transition-colors"></i> Reports
+                </button>
+                
+                <p class="px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider mt-8 mb-4">Preferences</p>
+                <button onclick="app.showView('settings')" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium transition-all hover:bg-white/5 hover:text-white group">
+                    <i data-lucide="settings" class="w-5 h-5 text-slate-400 group-hover:text-white transition-colors"></i> Settings
+                </button>
+            </nav>
+        </aside>
+
+        <!-- MAIN WRAPPER -->
+        <div class="flex-1 flex flex-col h-screen overflow-hidden relative">
+            <!-- TOP HEADER -->
+            <header class="h-16 bg-white/80 backdrop-blur-md border-b border-slate-200/60 sticky top-0 z-30 flex items-center justify-between px-4 lg:px-8 shadow-sm">
+                <div class="flex items-center gap-4">
+                    <button onclick="app.toggleSidebar()" class="lg:hidden p-2 -ml-2 text-slate-500 hover:bg-slate-100 rounded-lg transition-colors">
+                        <i data-lucide="menu" class="w-5 h-5"></i>
+                    </button>
+                    <h1 id="header-page-title" class="text-lg font-semibold text-slate-800 tracking-tight">Overview</h1>
+                </div>
+
+                <div class="flex items-center gap-3 lg:gap-5">
+                    <div class="hidden sm:flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-full">
+                        <div class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                        <span class="text-xs font-medium text-slate-600" id="header-user-email">user@email.com</span>
+                    </div>
+                    <button onclick="app.logout()" class="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-all" title="Sign Out">
+                        <i data-lucide="log-out" class="w-5 h-5"></i>
+                    </button>
+                </div>
+            </header>
+
+            <main id="main-content" class="flex-1 overflow-y-auto p-4 md:p-8 lg:p-10 w-full scroll-smooth">
+
+                <!-- DASHBOARD VIEW -->
+                <section id="view-dashboard" class="hidden-view max-w-6xl mx-auto animate-in fade-in duration-500 space-y-8">
+                    <!-- KPI Cards -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 md:gap-6">
+                        <!-- Total Expenses -->
+                        <div class="bg-white p-6 rounded-2xl shadow-soft border border-slate-200/60 hover:-translate-y-1 hover:shadow-float transition-all duration-300 group">
+                            <div class="flex justify-between items-start mb-4">
+                                <div class="p-3 bg-brand-50 text-brand-600 rounded-xl group-hover:scale-110 transition-transform duration-300"><i data-lucide="wallet" class="w-5 h-5"></i></div>
+                            </div>
+                            <div>
+                                <h3 id="kpi-total" class="text-3xl font-bold text-slate-900 tracking-tight">₹0.00</h3>
+                                <p class="text-sm font-medium text-slate-500 mt-1">Total Expenses</p>
+                            </div>
+                        </div>
+                        <!-- Total Paid -->
+                        <div class="bg-white p-6 rounded-2xl shadow-soft border border-slate-200/60 hover:-translate-y-1 hover:shadow-float transition-all duration-300 group">
+                            <div class="flex justify-between items-start mb-4">
+                                <div class="p-3 bg-emerald-50 text-emerald-600 rounded-xl group-hover:scale-110 transition-transform duration-300"><i data-lucide="trending-up" class="w-5 h-5"></i></div>
+                            </div>
+                            <div>
+                                <h3 id="kpi-paid" class="text-3xl font-bold text-emerald-600 tracking-tight">₹0.00</h3>
+                                <p class="text-sm font-medium text-slate-500 mt-1">Total Collected</p>
+                            </div>
+                        </div>
+                        <!-- Total Pending -->
+                        <div class="bg-white p-6 rounded-2xl shadow-soft border border-slate-200/60 hover:-translate-y-1 hover:shadow-float transition-all duration-300 group">
+                            <div class="flex justify-between items-start mb-4">
+                                <div class="p-3 bg-orange-50 text-orange-500 rounded-xl group-hover:scale-110 transition-transform duration-300"><i data-lucide="alert-circle" class="w-5 h-5"></i></div>
+                            </div>
+                            <div>
+                                <h3 id="kpi-pending" class="text-3xl font-bold text-orange-500 tracking-tight">₹0.00</h3>
+                                <p class="text-sm font-medium text-slate-500 mt-1">Total Pending</p>
+                            </div>
+                        </div>
+                        <!-- Total Bills -->
+                        <div class="bg-white p-6 rounded-2xl shadow-soft border border-slate-200/60 hover:-translate-y-1 hover:shadow-float transition-all duration-300 group">
+                            <div class="flex justify-between items-start mb-4">
+                                <div class="p-3 bg-purple-50 text-purple-600 rounded-xl group-hover:scale-110 transition-transform duration-300"><i data-lucide="receipt" class="w-5 h-5"></i></div>
+                            </div>
+                            <div>
+                                <h3 id="kpi-bills" class="text-3xl font-bold text-slate-900 tracking-tight">0</h3>
+                                <p class="text-sm font-medium text-slate-500 mt-1">Total Bills Logged</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Member Summary Table Card -->
+                    <div class="bg-white rounded-2xl shadow-soft border border-slate-200/60 overflow-hidden">
+                        <div class="px-6 py-5 border-b border-slate-100 flex justify-between items-center">
+                            <h3 class="font-semibold text-lg text-slate-800 tracking-tight">Team Balances</h3>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr class="bg-slate-50/50 text-slate-400 text-xs uppercase tracking-wider font-semibold border-b border-slate-100">
+                                        <th class="px-6 py-4 font-medium">Member</th>
+                                        <th class="px-6 py-4 font-medium">Total Share</th>
+                                        <th class="px-6 py-4 font-medium">Paid</th>
+                                        <th class="px-6 py-4 font-medium">Pending</th>
+                                        <th class="px-6 py-4 font-medium text-right">Details</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="dashboard-tbody" class="divide-y divide-slate-100/80 bg-white">
+                                    <!-- Populated by JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- REPORTS VIEW -->
+                <section id="view-reports" class="hidden-view max-w-6xl mx-auto animate-in fade-in duration-500 space-y-6">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                        <div>
+                            <h2 class="text-2xl font-bold text-slate-800 tracking-tight">Analytics & Reports</h2>
+                            <p class="text-slate-500 mt-1 text-sm font-medium">Filter and export your expense data.</p>
+                        </div>
+                        <button onclick="app.exportCSV()" class="bg-brand-50 text-brand-700 border border-brand-200 px-5 py-2.5 rounded-xl font-semibold hover:bg-brand-100 transition-all flex items-center gap-2 shadow-sm active:scale-95">
+                            <i data-lucide="download" class="w-4 h-4"></i> Export CSV
+                        </button>
+                    </div>
+
+                    <!-- Filters -->
+                    <div class="bg-white p-5 rounded-2xl shadow-soft border border-slate-200/60 grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Time Period</label>
+                            <select id="filter-date" onchange="app.renderReports()" class="w-full border border-slate-200 p-3 rounded-xl focus:ring-2 focus:ring-brand-500/20 outline-none bg-slate-50 text-sm font-medium">
+                                <option value="all">All Time</option>
+                                <option value="today">Today</option>
+                                <option value="week">This Week</option>
+                                <option value="month">This Month</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Member</label>
+                            <select id="filter-member" onchange="app.renderReports()" class="w-full border border-slate-200 p-3 rounded-xl focus:ring-2 focus:ring-brand-500/20 outline-none bg-slate-50 text-sm font-medium">
+                                <option value="all">All Members</option>
+                                <!-- Populated dynamically -->
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Status</label>
+                            <select id="filter-status" onchange="app.renderReports()" class="w-full border border-slate-200 p-3 rounded-xl focus:ring-2 focus:ring-brand-500/20 outline-none bg-slate-50 text-sm font-medium">
+                                <option value="all">All Statuses</option>
+                                <option value="Pending">Pending</option>
+                                <option value="Paid">Paid</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Report Table -->
+                    <div class="bg-white rounded-2xl shadow-soft border border-slate-200/60 overflow-hidden">
+                        <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                            <h3 class="font-semibold text-sm text-slate-700 tracking-tight">Filtered Results</h3>
+                            <span id="report-total" class="font-bold text-slate-800 bg-white px-3 py-1 rounded-lg border border-slate-200 shadow-sm text-sm">Total: ₹0.00</span>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr class="bg-slate-50/50 text-slate-400 text-xs uppercase tracking-wider font-semibold border-b border-slate-100">
+                                        <th class="px-6 py-4">Date</th>
+                                        <th class="px-6 py-4">Member</th>
+                                        <th class="px-6 py-4">Item</th>
+                                        <th class="px-6 py-4">Amount</th>
+                                        <th class="px-6 py-4">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="reports-tbody" class="divide-y divide-slate-100/80 bg-white">
+                                    <!-- Populated by JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ADD BILL VIEW -->
+                <section id="view-add-bill" class="hidden-view max-w-3xl mx-auto animate-in fade-in duration-500">
+                    <form id="add-bill-form" onsubmit="app.handleAddBill(event)" class="bg-white p-8 md:p-10 rounded-3xl shadow-soft border border-slate-200/60 space-y-8">
+                        <div class="border-b border-slate-100 pb-6 mb-6">
+                            <h2 class="text-2xl font-bold text-slate-800 tracking-tight">Log New Expense</h2>
+                            <p class="text-slate-500 mt-1 text-sm font-medium">Enter bill details to automatically split among selected team members.</p>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label class="block text-sm font-semibold text-slate-700 mb-2">Date</label>
+                                <input type="date" id="bill-date" required class="w-full border border-slate-200 p-3.5 rounded-xl focus:ring-4 focus:ring-brand-500/10 focus:border-brand-500 outline-none bg-slate-50 focus:bg-white font-medium transition-all text-slate-700 hover:border-slate-300">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-slate-700 mb-2">Time</label>
+                                <input type="time" id="bill-time" required class="w-full border border-slate-200 p-3.5 rounded-xl focus:ring-4 focus:ring-brand-500/10 focus:border-brand-500 outline-none bg-slate-50 focus:bg-white font-medium transition-all text-slate-700 hover:border-slate-300">
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-semibold text-slate-700 mb-2">Item Description</label>
+                            <input type="text" id="bill-item" placeholder="e.g., Friday Pizza & Drinks" required class="w-full border border-slate-200 p-3.5 rounded-xl focus:ring-4 focus:ring-brand-500/10 focus:border-brand-500 outline-none bg-slate-50 focus:bg-white font-medium transition-all placeholder:text-slate-400 hover:border-slate-300">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-semibold text-slate-700 mb-2">Total Amount (₹)</label>
+                            <div class="relative">
+                                <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-xl font-bold">₹</span>
+                                <input type="number" step="0.01" min="0.01" id="bill-amount" placeholder="0.00" required class="w-full border border-slate-200 pl-10 p-4 rounded-xl text-2xl font-bold text-slate-800 focus:ring-4 focus:ring-brand-500/10 focus:border-brand-500 outline-none bg-slate-50 focus:bg-white transition-all hover:border-slate-300">
+                            </div>
+                        </div>
+
+                        <div class="pt-2">
+                            <div class="flex justify-between items-center mb-4">
+                                <label class="block text-sm font-semibold text-slate-700">Split among team members:</label>
+                                <button type="button" onclick="app.toggleAllCheckboxes()" class="text-xs text-brand-600 font-bold uppercase tracking-wider hover:bg-brand-50 px-3 py-1.5 rounded-lg transition-colors border border-transparent hover:border-brand-100">Toggle All</button>
+                            </div>
+                            <div id="split-members-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-h-72 overflow-y-auto p-1 scroll-smooth">
+                            </div>
+                            
+                            <div class="mt-6 p-5 bg-brand-50/50 rounded-xl border border-brand-100 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-inner">
+                                <span class="text-sm font-semibold text-brand-800">Calculated Split</span>
+                                <span id="split-calc-preview" class="text-2xl font-bold text-brand-700 tracking-tight">₹0.00 <span class="text-sm font-medium text-brand-600/70">/ each</span></span>
+                            </div>
+                        </div>
+
+                        <button type="submit" id="submit-bill-btn" class="w-full bg-slate-900 text-white py-4 rounded-xl font-semibold hover:bg-slate-800 shadow-lg shadow-slate-900/20 transition-all flex justify-center items-center gap-2 active:scale-[0.98]">
+                            <i data-lucide="check" class="w-5 h-5"></i> Save Expense
+                        </button>
+                    </form>
+                </section>
+
+                <!-- MEMBERS VIEW -->
+                <section id="view-members" class="hidden-view max-w-4xl mx-auto animate-in fade-in duration-500 space-y-6">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                        <div>
+                            <h2 class="text-2xl font-bold text-slate-800 tracking-tight">Team Directory</h2>
+                            <p class="text-slate-500 mt-1 text-sm font-medium">Manage people sharing the expenses.</p>
+                        </div>
+                    </div>
+
+                    <!-- Add & Search -->
+                    <div class="bg-white p-6 rounded-2xl shadow-soft border border-slate-200/60 grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="relative w-full">
+                            <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                <i data-lucide="search" class="w-5 h-5 text-slate-400"></i>
+                            </div>
+                            <input type="text" id="search-member-input" onkeyup="app.renderMembers()" placeholder="Search members..." class="w-full border border-slate-200 pl-11 pr-4 py-3.5 rounded-xl focus:ring-4 focus:ring-brand-500/10 focus:border-brand-500 outline-none bg-slate-50 focus:bg-white font-medium transition-all">
+                        </div>
+
+                        <div class="flex gap-2 w-full">
+                            <input type="text" id="new-member-name" placeholder="New member name" class="flex-1 border border-slate-200 p-3.5 rounded-xl focus:ring-4 focus:ring-brand-500/10 focus:border-brand-500 outline-none bg-slate-50 focus:bg-white font-medium transition-all">
+                            <button onclick="app.handleAddMember()" id="add-member-btn" class="bg-brand-600 text-white px-5 py-3.5 rounded-xl font-semibold hover:bg-brand-700 shadow-md shadow-brand-500/20 transition-all active:scale-[0.98] flex items-center justify-center">
+                                <i data-lucide="user-plus" class="w-5 h-5"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Members List -->
+                    <div class="bg-white rounded-2xl shadow-soft border border-slate-200/60 overflow-hidden">
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left">
+                                <tbody id="members-tbody" class="divide-y divide-slate-100">
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- SETTINGS VIEW -->
+                <section id="view-settings" class="hidden-view max-w-4xl mx-auto animate-in fade-in duration-500 space-y-6">
+                    <div>
+                        <h2 class="text-2xl font-bold text-slate-800 tracking-tight">Preferences</h2>
+                        <p class="text-slate-500 mt-1 text-sm font-medium">Configure payments and public sharing options.</p>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <!-- Payment Configuration -->
+                        <div class="bg-white p-8 rounded-2xl shadow-soft border border-slate-200/60 flex flex-col h-full hover:shadow-float transition-shadow duration-300">
+                            <div class="flex items-center gap-4 mb-6">
+                                <div class="p-3 bg-brand-50 text-brand-600 rounded-xl"><i data-lucide="qr-code" class="w-6 h-6"></i></div>
+                                <div>
+                                    <h3 class="font-semibold text-lg text-slate-800 tracking-tight">UPI Details</h3>
+                                    <p class="text-sm text-slate-500 font-medium">For generating collection QR codes.</p>
+                                </div>
+                            </div>
+                            
+                            <div class="flex flex-col gap-4 mt-auto">
+                                <input type="text" id="upi-id-input" placeholder="e.g., yourname@upi" class="w-full border border-slate-200 p-3.5 rounded-xl focus:ring-4 focus:ring-brand-500/10 focus:border-brand-500 outline-none bg-slate-50 focus:bg-white font-medium text-slate-700 transition-all hover:border-slate-300">
+                                <button onclick="app.saveProfile()" id="save-upi-btn" class="w-full bg-slate-900 text-white px-6 py-3.5 rounded-xl font-semibold hover:bg-slate-800 shadow-sm transition-all active:scale-[0.98] flex items-center justify-center gap-2">
+                                    Save UPI ID
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Sharing Configuration -->
+                        <div class="bg-white p-8 rounded-2xl shadow-soft border border-slate-200/60 flex flex-col h-full hover:shadow-float transition-shadow duration-300">
+                            <div class="flex items-center gap-4 mb-6">
+                                <div class="p-3 bg-purple-50 text-purple-600 rounded-xl"><i data-lucide="share-2" class="w-6 h-6"></i></div>
+                                <div>
+                                    <h3 class="font-semibold text-lg text-slate-800 tracking-tight">Public Link</h3>
+                                    <p class="text-sm text-slate-500 font-medium">Share read-only view with team.</p>
+                                </div>
+                            </div>
+
+                            <div class="flex flex-col gap-4 mt-auto">
+                                <div id="share-link-container" class="hidden bg-slate-50 border border-slate-200 rounded-xl p-1.5 flex items-center gap-1">
+                                    <input type="text" id="share-link-input" readonly class="flex-1 bg-transparent border-none focus:ring-0 text-sm font-medium text-slate-600 px-3 outline-none truncate">
+                                    <button onclick="app.copyShareLink()" class="p-2.5 bg-white border border-slate-200 hover:bg-slate-100 rounded-lg text-slate-600 transition-colors shadow-sm active:scale-95" title="Copy">
+                                        <i data-lucide="copy" class="w-4 h-4"></i>
+                                    </button>
+                                    <a id="share-link-open" href="#" target="_blank" class="p-2.5 bg-white border border-slate-200 hover:bg-slate-100 rounded-lg text-slate-600 transition-colors shadow-sm active:scale-95" title="Open Link">
+                                        <i data-lucide="external-link" class="w-4 h-4"></i>
+                                    </a>
+                                </div>
+                                
+                                <button onclick="app.generateShareLink()" class="w-full bg-white border border-slate-200 text-slate-700 py-3.5 rounded-xl font-semibold hover:bg-slate-50 shadow-sm transition-all active:scale-[0.98] flex items-center justify-center gap-2">
+                                    <i data-lucide="link" class="w-4 h-4"></i> <span id="share-btn-text">Generate Share Link</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+            </main>
+        </div>
+    </div>
+
+    <!-- SHARED DASHBOARD (PUBLIC) -->
+    <div id="shared-container" class="w-full min-h-screen bg-[#F8FAFC] pb-16 pt-10 px-4" style="display: none;">
+        <div class="max-w-4xl mx-auto space-y-10 animate-in fade-in duration-700">
+            <header class="text-center space-y-5">
+                <div class="bg-gradient-to-br from-brand-500 to-purple-600 w-20 h-20 rounded-[20px] flex items-center justify-center mx-auto mb-2 shadow-lg shadow-brand-500/20">
+                    <i data-lucide="pie-chart" class="w-10 h-10 text-white"></i>
+                </div>
+                <div>
+                    <h1 class="text-3xl md:text-4xl font-extrabold text-slate-900 tracking-tight">Team Dashboard</h1>
+                    <p class="text-slate-500 mt-2 font-medium">Public read-only expense overview</p>
+                </div>
+            </header>
+
+            <div class="bg-white rounded-3xl shadow-float border border-slate-200/60 overflow-hidden max-w-3xl mx-auto">
+                <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-white">
+                    <h3 class="font-bold text-xl text-slate-800 tracking-tight">Pending Dues</h3>
+                    <div class="bg-orange-50 border border-orange-100 px-4 py-2 rounded-xl flex items-center gap-2">
+                        <span class="text-xs font-bold text-orange-600/70 uppercase tracking-wider">Total</span>
+                        <span id="shared-total-pending" class="text-orange-600 font-bold text-lg tracking-tight">₹0.00</span>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left">
+                        <tbody id="shared-tbody" class="divide-y divide-slate-50">
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="shared-payment-info" class="hidden bg-slate-900 text-white p-10 rounded-3xl shadow-2xl max-w-md mx-auto text-center relative overflow-hidden border border-slate-800">
+                <div class="absolute -top-10 -right-10 opacity-[0.03] pointer-events-none transform rotate-12">
+                    <i data-lucide="qr-code" class="w-64 h-64"></i>
+                </div>
+                <h3 class="text-xl font-bold mb-2 relative z-10 tracking-tight">Clear Your Dues</h3>
+                <p class="text-slate-400 text-sm mb-8 relative z-10 font-medium">Scan code using any UPI app to pay admin.</p>
+                
+                <div class="bg-white p-4 rounded-2xl inline-block mx-auto shadow-2xl mb-6 relative z-10">
+                    <img id="shared-qr-img" src="" alt="UPI QR" class="w-40 h-40 rounded-xl" />
+                </div>
+                <div>
+                    <p class="text-slate-500 text-xs font-semibold uppercase tracking-widest mb-2">UPI ID</p>
+                    <p id="shared-upi-id" class="text-white font-mono bg-white/10 px-4 py-2.5 rounded-xl text-sm inline-block relative z-10 border border-white/10 tracking-wider"></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MEMBER DETAIL MODAL -->
+    <div id="member-detail-modal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100] hidden items-center justify-center p-4">
+        <div class="bg-white rounded-[24px] shadow-float max-w-4xl w-full max-h-[85vh] flex flex-col modal-exit border border-slate-200/50" id="member-detail-content">
+            <div class="p-6 md:px-8 md:py-6 border-b border-slate-100 flex justify-between items-center bg-white rounded-t-[24px] shrink-0">
+                <div class="flex items-center gap-4">
+                    <div id="detail-avatar" class="w-12 h-12 rounded-2xl flex items-center justify-center font-bold text-lg shadow-sm border border-white/50">N</div>
+                    <div>
+                        <h2 class="text-xl font-bold text-slate-800 tracking-tight" id="detail-member-name">Member Name</h2>
+                        <p class="text-xs text-slate-500 font-medium uppercase tracking-wider mt-0.5">Expense History</p>
+                    </div>
+                </div>
+                <button onclick="app.closeMemberDetailModal()" class="text-slate-400 hover:text-slate-700 hover:bg-slate-100 p-2 rounded-xl transition-all active:scale-95 shrink-0 border border-transparent hover:border-slate-200">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            
+            <div class="flex-1 overflow-y-auto p-6 md:p-8 bg-slate-50/50 rounded-b-[24px]">
+                <div class="grid grid-cols-2 gap-4 md:gap-6 mb-8">
+                    <div class="bg-white rounded-2xl shadow-soft border border-slate-200/60 p-6 flex flex-col justify-center relative overflow-hidden group">
+                        <p class="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1.5 relative z-10">Pending Dues</p>
+                        <p id="detail-member-pending" class="text-3xl font-bold text-orange-500 tracking-tight relative z-10">₹0.00</p>
+                    </div>
+                    <div class="bg-white rounded-2xl shadow-soft border border-slate-200/60 p-6 flex flex-col justify-center relative overflow-hidden group">
+                        <p class="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1.5 relative z-10">Total Paid</p>
+                        <p id="detail-member-paid" class="text-3xl font-bold text-emerald-600 tracking-tight relative z-10">₹0.00</p>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl shadow-soft border border-slate-200/60 overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-slate-50 text-slate-400 text-xs uppercase tracking-wider font-semibold border-b border-slate-100">
+                                    <th class="px-6 py-4">Date & Item</th>
+                                    <th class="px-6 py-4">Amount</th>
+                                    <th class="px-6 py-4">Status</th>
+                                    <th class="px-6 py-4 text-right">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="member-detail-tbody" class="divide-y divide-slate-100/80">
+                                <!-- Populated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PAYMENT MODAL -->
+    <div id="payment-modal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[200] hidden items-center justify-center p-4">
+        <div class="bg-white rounded-[24px] shadow-float max-w-[360px] w-full overflow-hidden flex flex-col modal-exit border border-slate-200/50" id="payment-modal-content">
+            <div class="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-white">
+                <h3 class="font-bold text-lg text-slate-800 tracking-tight flex items-center gap-2">
+                    <i data-lucide="qr-code" class="w-5 h-5 text-slate-400"></i> Scan to Pay
+                </h3>
+                <button onclick="app.closePaymentModal()" class="text-slate-400 hover:text-slate-700 bg-slate-50 hover:bg-slate-100 p-1.5 rounded-lg border border-slate-200 transition-all active:scale-95">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+            </div>
+            
+            <div class="p-8 text-center bg-white">
+                <p class="text-slate-400 text-xs font-bold uppercase tracking-widest mb-1">Paying to Admin</p>
+                <p id="modal-amount" class="text-4xl font-bold text-slate-800 mb-6 tracking-tight">₹0.00</p>
+                
+                <div class="bg-white p-3 rounded-2xl inline-block mx-auto shadow-sm border border-slate-200 mb-6 relative">
+                    <div id="modal-qr-placeholder" class="w-[180px] h-[180px] bg-slate-50 flex items-center justify-center text-slate-300 rounded-xl">
+                        <i data-lucide="loader-2" class="w-8 h-8 animate-spin"></i>
+                    </div>
+                    <img id="modal-qr-img" src="" class="w-[180px] h-[180px] hidden absolute top-3 left-3 rounded-lg" alt="QR Code" onload="this.classList.remove('hidden'); const p = document.getElementById('modal-qr-placeholder'); if(p) p.classList.add('hidden');" />
+                </div>
+                
+                <div class="flex items-center justify-center gap-2 bg-slate-50 py-2 px-3 rounded-xl border border-slate-200 w-max mx-auto hover:bg-slate-100 transition-colors cursor-pointer group active:scale-95" onclick="app.copyUpiId()">
+                    <p id="modal-upi-id" class="text-xs font-mono text-slate-600 font-medium">upi_id</p>
+                    <i data-lucide="copy" class="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-600"></i>
+                </div>
+            </div>
+
+            <div class="p-5 border-t border-slate-100 bg-slate-50/50">
+                <button onclick="app.markCurrentAsPaid()" id="modal-confirm-btn" class="w-full bg-slate-900 text-white py-3.5 rounded-xl font-semibold hover:bg-slate-800 shadow-sm transition-all flex justify-center items-center gap-2 active:scale-[0.98]">
+                    Confirm Payment
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- PURE JAVASCRIPT APPLICATION LOGIC -->
+    <script type="module">
+        import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+
+        const supabase = createClient(
+            "https://hcperophmilazbkhlflg.supabase.co",
+            "sb_publishable_McEbJz4xKyZyMZTFMwIeQA_YFjdIcN0"
+        );
+
+        const state = {
+            currentUser: null,
+            userProfile: { upi_id: '' },
+            members: [],
+            bills: [],
+            expenses: [],
+            currentView: '',
+            selectedMemberId: null,
+            activeExpenseId: null,
+            isSharedMode: false,
+            reportFilters: { date: 'all', member: 'all', status: 'all' }
+        };
+
+        const $ = id => {
+            const el = document.getElementById(id);
+            if (!el) console.warn(`[SnackSync] Missing DOM Element: ${id}`);
+            return el;
+        };
+
+        window.app = {
+            // Container Toggles
+            showAppContainer() {
+                const appCont = $('app-container');
+                if (appCont) appCont.style.display = 'flex';
+                const logCont = $('login-container');
+                if (logCont) logCont.style.display = 'none';
+                const shrCont = $('shared-container');
+                if (shrCont) shrCont.style.display = 'none';
+            },
+            showLoginContainer() {
+                const appCont = $('app-container');
+                if (appCont) appCont.style.display = 'none';
+                const logCont = $('login-container');
+                if (logCont) logCont.style.display = 'flex';
+                const shrCont = $('shared-container');
+                if (shrCont) shrCont.style.display = 'none';
+            },
+            showSharedContainer() {
+                const appCont = $('app-container');
+                if (appCont) appCont.style.display = 'none';
+                const logCont = $('login-container');
+                if (logCont) logCont.style.display = 'none';
+                const shrCont = $('shared-container');
+                if (shrCont) shrCont.style.display = 'block';
+            },
+            hideGlobalLoader() {
+                const loader = $('global-loader');
+                if (!loader) return;
+                loader.classList.add('opacity-0');
+                setTimeout(() => loader.style.display = 'none', 700);
+            },
+
+            showToast(message, type = 'success') {
+                const container = $('toast-container');
+                if (!container) return;
+
+                const toast = document.createElement('div');
+                const bgColor = type === 'success' ? 'bg-slate-900 text-white' : (type === 'error' ? 'bg-red-50 border border-red-200 text-red-700' : 'bg-white border border-slate-200 text-slate-800');
+                const icon = type === 'success' ? 'check-circle' : (type === 'error' ? 'alert-circle' : 'info');
+                const iconColor = type === 'success' ? 'text-emerald-400' : (type === 'error' ? 'text-red-500' : 'text-blue-500');
+
+                toast.className = `${bgColor} px-4 py-3 rounded-[14px] shadow-float flex items-center gap-3 font-medium text-sm toast-enter pointer-events-auto w-full max-w-sm`;
+                toast.innerHTML = `<i data-lucide="${icon}" class="w-5 h-5 ${iconColor}"></i> <span>${message}</span>`;
+                
+                container.appendChild(toast);
+                lucide.createIcons();
+
+                setTimeout(() => {
+                    toast.classList.replace('toast-enter', 'toast-exit');
+                    setTimeout(() => toast.remove(), 400);
+                }, 3000);
+            },
+
+            async init() {
+                lucide.createIcons();
+
+                const params = new URLSearchParams(window.location.search);
+                const shareToken = params.get('share');
+                
+                if (shareToken) {
+                    state.isSharedMode = true;
+                    this.showSharedContainer();
+                    await this.loadSharedDashboard(shareToken);
+                    this.hideGlobalLoader();
+                    return;
+                }
+
+                try {
+                    const { data: { user }, error } = await supabase.auth.getUser();
+                    
+                    if (error) console.warn("Auth status check:", error.message);
+                    
+                    if (user) {
+                        this.handleAuthSuccess(user);
+                    } else {
+                        this.showLoginContainer();
+                        this.hideGlobalLoader();
+                    }
+
+                    supabase.auth.onAuthStateChange((event, session) => {
+                        if (session && session.user) {
+                            if (!state.currentUser) this.handleAuthSuccess(session.user);
+                        } else {
+                            if (state.currentUser) this.handleAuthOut();
+                        }
+                    });
+
+                    const amtEl = $('bill-amount');
+                    if (amtEl) amtEl.addEventListener('input', () => this.updateSplitPreview());
+
+                } catch (err) {
+                    console.error("Init Error:", err);
+                    this.showLoginContainer();
+                    this.hideGlobalLoader();
+                }
+            },
+
+            async loginWithGoogle() {
+                try {
+                    const { error } = await supabase.auth.signInWithOAuth({ provider: 'google' });
+                    if (error) throw error;
+                } catch (err) {
+                    this.showError("Google login failed: " + err.message);
+                }
+            },
+
+            async login() {
+                const emailEl = $('email');
+                const passEl = $('password');
+                if (!emailEl || !passEl) return;
+
+                const email = emailEl.value.trim();
+                const password = passEl.value;
+                this.hideError();
+                
+                if (!email || !password) {
+                    this.showError("Please enter your email and password.");
+                    return;
+                }
+
+                try {
+                    const { error } = await supabase.auth.signInWithPassword({ email, password });
+                    if (error) throw error;
+                } catch (err) {
+                    this.showError(err.message || "Invalid login credentials.");
+                }
+            },
+
+            async signup() {
+                const emailEl = $('email');
+                const passEl = $('password');
+                if (!emailEl || !passEl) return;
+
+                const email = emailEl.value.trim();
+                const password = passEl.value;
+                this.hideError();
+                
+                if (!email || !password) {
+                    this.showError("Please enter an email and password to sign up.");
+                    return;
+                }
+
+                try {
+                    const { error } = await supabase.auth.signUp({ email, password });
+                    if (error) throw error;
+                    this.showToast("Account created! Please log in.", "success");
+                } catch (err) {
+                    this.showError(err.message || "Failed to create account.");
+                }
+            },
+
+            async logout() {
+                await supabase.auth.signOut();
+            },
+
+            handleAuthSuccess(user) {
+                state.currentUser = user;
+                
+                const hdrUserEmail = $('header-user-email');
+                if (hdrUserEmail) hdrUserEmail.textContent = user.email;
+                const usrEmailDisp = $('user-email-display');
+                if (usrEmailDisp) usrEmailDisp.textContent = user.email;
+                
+                this.showAppContainer();
+                
+                this.loadData().then(() => {
+                    this.showView('dashboard');
+                    this.hideGlobalLoader();
+                });
+            },
+
+            handleAuthOut() {
+                state.currentUser = null;
+                this.showLoginContainer();
+            },
+
+            showError(msg) {
+                const el = $('auth-error');
+                if (el) {
+                    el.textContent = msg;
+                    el.classList.remove('hidden');
+                }
+            },
+            hideError() {
+                const el = $('auth-error');
+                if (el) el.classList.add('hidden');
+            },
+
+            toggleSidebar() {
+                const sidebar = $('sidebar');
+                const overlay = $('mobile-overlay');
+                if (!sidebar || !overlay) return;
+
+                const isClosed = sidebar.classList.contains('-translate-x-full');
+                
+                if (isClosed) {
+                    sidebar.classList.remove('-translate-x-full');
+                    overlay.classList.remove('hidden');
+                    setTimeout(()=> overlay.classList.remove('opacity-0'), 10);
+                } else {
+                    sidebar.classList.add('-translate-x-full');
+                    overlay.classList.add('opacity-0');
+                    setTimeout(()=> overlay.classList.add('hidden'), 300);
+                }
+            },
+
+            showView(viewName) {
+                if (state.isSharedMode) return;
+
+                const titles = {
+                    'dashboard': 'Overview',
+                    'add-bill': 'Log Expense',
+                    'members': 'Team Directory',
+                    'reports': 'Analytics',
+                    'settings': 'Preferences'
+                };
+                
+                const hdrTitle = $('header-page-title');
+                if (hdrTitle) hdrTitle.textContent = titles[viewName] || 'Overview';
+
+                document.querySelectorAll('#app-container section[id^="view-"]').forEach(sec => sec.classList.add('hidden-view'));
+                
+                const targetView = $(`view-${viewName}`);
+                if (targetView) targetView.classList.remove('hidden-view');
+                
+                state.currentView = viewName;
+
+                if (window.innerWidth < 1024) {
+                    const sidebar = $('sidebar');
+                    if (sidebar) sidebar.classList.add('-translate-x-full');
+                    const overlay = $('mobile-overlay');
+                    if (overlay) {
+                        overlay.classList.add('opacity-0');
+                        setTimeout(()=> overlay.classList.add('hidden'), 300);
+                    }
+                }
+
+                document.querySelectorAll('.nav-btn').forEach(btn => {
+                    btn.classList.remove('bg-white/10', 'text-white');
+                    btn.classList.add('text-slate-400');
+                    if (btn.textContent.toLowerCase().includes(viewName.split('-')[0])) {
+                        btn.classList.add('bg-white/10', 'text-white');
+                        btn.classList.remove('text-slate-400');
+                    }
+                });
+
+                if (viewName === 'dashboard') this.renderDashboard();
+                if (viewName === 'add-bill') this.renderAddBillView();
+                if (viewName === 'members') this.renderMembers();
+                if (viewName === 'reports') this.renderReportsViewInit();
+                if (viewName === 'settings') this.renderSettings();
+
+                setTimeout(() => lucide.createIcons(), 10);
+            },
+
+            async loadData() {
+                if (!state.currentUser) return;
+                try {
+                    const [memRes, billRes, expRes, profRes] = await Promise.all([
+                        supabase.from('members').select('*').order('created_at', { ascending: true }),
+                        supabase.from('bills').select('*').order('date', { ascending: false }),
+                        supabase.from('expenses').select('*').order('date', { ascending: false }),
+                        supabase.from('user_profiles').select('*').eq('user_id', state.currentUser.id).maybeSingle()
+                    ]);
+
+                    if (memRes.error) throw memRes.error;
+                    if (expRes.error) throw expRes.error;
+
+                    state.members = memRes.data || [];
+                    state.bills = billRes.data || [];
+                    state.expenses = expRes.data || [];
+                    state.userProfile = profRes.data || { upi_id: '' };
+                } catch (err) {
+                    console.error("Data Sync Error:", err);
+                    this.showToast("Failed to sync data", "error");
+                }
+            },
+
+            getAvatarColor(name) {
+                const colors = [
+                    'bg-indigo-100 text-indigo-700 border-indigo-200',
+                    'bg-blue-100 text-blue-700 border-blue-200', 
+                    'bg-emerald-100 text-emerald-700 border-emerald-200', 
+                    'bg-purple-100 text-purple-700 border-purple-200', 
+                    'bg-rose-100 text-rose-700 border-rose-200', 
+                    'bg-amber-100 text-amber-700 border-amber-200'
+                ];
+                let charCode = name.charCodeAt(0) || 0;
+                return colors[charCode % colors.length];
+            },
+
+            getEmptyStateHTML(icon, title, subtitle) {
+                return `
+                <tr><td colspan="100%">
+                    <div class="flex flex-col items-center justify-center p-12 text-center border-2 border-dashed border-slate-200 rounded-2xl m-4">
+                        <div class="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center mb-4 border border-slate-100 shadow-sm">
+                            <i data-lucide="${icon}" class="w-8 h-8 text-slate-400"></i>
+                        </div>
+                        <h4 class="text-base font-semibold text-slate-800">${title}</h4>
+                        <p class="text-slate-500 font-medium text-sm mt-1 max-w-[250px] mx-auto">${subtitle}</p>
+                    </div>
+                </td></tr>`;
+            },
+
+            renderDashboard() {
+                let tExp = 0, tPaid = 0, tPending = 0;
+                
+                state.expenses.forEach(e => {
+                    const amt = Number(e.amount);
+                    tExp += amt;
+                    if (e.status === 'Paid') tPaid += amt;
+                    if (e.status === 'Pending') tPending += amt;
+                });
+
+                const kpiTotal = $('kpi-total'); if (kpiTotal) kpiTotal.textContent = `₹${tExp.toFixed(2)}`;
+                const kpiPaid = $('kpi-paid'); if (kpiPaid) kpiPaid.textContent = `₹${tPaid.toFixed(2)}`;
+                const kpiPending = $('kpi-pending'); if (kpiPending) kpiPending.textContent = `₹${tPending.toFixed(2)}`;
+                const kpiBills = $('kpi-bills'); if (kpiBills) kpiBills.textContent = state.bills.length;
+
+                const tbody = $('dashboard-tbody');
+                if (!tbody) return;
+                tbody.innerHTML = '';
+
+                if (state.members.length === 0) {
+                    tbody.innerHTML = this.getEmptyStateHTML('users', 'No active members', 'Add members in the directory to track balances.');
+                    return;
+                }
+
+                state.members.forEach(m => {
+                    const mExps = state.expenses.filter(e => e.member_id === m.member_id);
+                    const paid = mExps.filter(e => e.status === 'Paid').reduce((s, e) => s + Number(e.amount), 0);
+                    const pending = mExps.filter(e => e.status === 'Pending').reduce((s, e) => s + Number(e.amount), 0);
+                    const total = paid + pending;
+                    
+                    const avatarColor = this.getAvatarColor(m.name);
+
+                    const tr = document.createElement('tr');
+                    tr.className = "hover:bg-slate-50/80 cursor-pointer transition-colors group";
+                    tr.onclick = (e) => {
+                        if(e.target.tagName !== 'BUTTON') this.openMemberDetailModal(m.member_id);
+                    };
+
+                    tr.innerHTML = `
+                        <td class="px-6 py-4 flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-full ${avatarColor} flex items-center justify-center font-bold text-sm shadow-sm border border-white/50">
+                                ${m.name.charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                                <span class="font-semibold text-slate-800 block text-sm group-hover:text-brand-600 transition-colors">${m.name}</span>
+                                <span class="text-xs text-slate-400 font-medium">Member #${m.member_id}</span>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 font-semibold text-slate-600 text-sm">₹${total.toFixed(2)}</td>
+                        <td class="px-6 py-4 font-semibold text-emerald-600 text-sm">₹${paid.toFixed(2)}</td>
+                        <td class="px-6 py-4">
+                            <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${pending > 0 ? 'bg-orange-100 text-orange-700' : 'bg-slate-100 text-slate-500'}">
+                                ₹${pending.toFixed(2)}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 text-right">
+                            <button onclick="app.openMemberDetailModal(${m.member_id}); event.stopPropagation();" class="text-slate-400 group-hover:text-brand-600 p-2 rounded-lg hover:bg-brand-50 transition-colors">
+                                <i data-lucide="arrow-right" class="w-4 h-4"></i>
+                            </button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            },
+
+            openMemberDetailModal(memberId) {
+                state.selectedMemberId = memberId;
+                this.renderMemberDetailModalContent();
+                
+                const modal = $('member-detail-modal');
+                const content = $('member-detail-content');
+                if (!modal || !content) return;
+
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+                
+                setTimeout(() => {
+                    content.classList.remove('modal-exit');
+                    content.classList.add('modal-enter');
+                }, 10);
+                setTimeout(() => lucide.createIcons(), 10);
+            },
+
+            closeMemberDetailModal() {
+                const modal = $('member-detail-modal');
+                const content = $('member-detail-content');
+                if (!modal || !content) return;
+
+                content.classList.remove('modal-enter');
+                content.classList.add('modal-exit');
+                
+                setTimeout(() => {
+                    modal.classList.add('hidden');
+                    modal.classList.remove('flex');
+                    state.selectedMemberId = null;
+                }, 300);
+            },
+
+            renderMemberDetailModalContent() {
+                const member = state.members.find(m => m.member_id === state.selectedMemberId);
+                if (!member) return;
+
+                const nameEl = $('detail-member-name');
+                if (nameEl) nameEl.textContent = member.name;
+                
+                const avatar = $('detail-avatar');
+                if (avatar) {
+                    avatar.className = `w-12 h-12 rounded-2xl flex items-center justify-center font-bold text-lg shadow-sm border border-white/50 ${this.getAvatarColor(member.name)}`;
+                    avatar.textContent = member.name.charAt(0).toUpperCase();
+                }
+
+                const exps = state.expenses.filter(e => e.member_id === member.member_id);
+                const paid = exps.filter(e => e.status === 'Paid').reduce((s, e) => s + Number(e.amount), 0);
+                const pending = exps.filter(e => e.status === 'Pending').reduce((s, e) => s + Number(e.amount), 0);
+
+                const pendingEl = $('detail-member-pending');
+                if (pendingEl) pendingEl.textContent = `₹${pending.toFixed(2)}`;
+                
+                const paidEl = $('detail-member-paid');
+                if (paidEl) paidEl.textContent = `₹${paid.toFixed(2)}`;
+
+                const tbody = $('member-detail-tbody');
+                if (!tbody) return;
+                tbody.innerHTML = '';
+
+                if (exps.length === 0) {
+                    tbody.innerHTML = this.getEmptyStateHTML('receipt', 'No expense records', 'No history found for this member.');
+                    return;
+                }
+
+                exps.forEach(e => {
+                    const tr = document.createElement('tr');
+                    tr.className = "hover:bg-slate-50/80 transition-colors";
+                    const isPending = e.status === 'Pending';
+                    const hasUpi = Boolean(state.userProfile?.upi_id);
+
+                    const bill = state.bills.find(b => b.id === e.bill_id);
+                    const itemName = bill ? bill.item : 'Shared Expense';
+                    
+                    tr.innerHTML = `
+                        <td class="px-6 py-4">
+                            <p class="font-semibold text-slate-800 text-sm">${itemName}</p>
+                            <p class="text-xs font-medium text-slate-500 mt-0.5">${new Date(e.date).toLocaleDateString()} • ${e.time}</p>
+                        </td>
+                        <td class="px-6 py-4 font-bold text-slate-800 text-sm">₹${Number(e.amount).toFixed(2)}</td>
+                        <td class="px-6 py-4">
+                            <span class="inline-flex items-center px-2 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider ${isPending ? 'bg-orange-100 text-orange-700' : 'bg-emerald-100 text-emerald-700'}">
+                                ${e.status}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 text-right">
+                            ${isPending ? `
+                                <div class="flex items-center justify-end gap-2">
+                                    ${hasUpi ? `
+                                        <button onclick="app.openPaymentModal('${e.id}')" class="bg-brand-50 hover:bg-brand-100 text-brand-600 border border-brand-200 px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95 flex items-center gap-1.5">
+                                            Pay
+                                        </button>
+                                    ` : ''}
+                                    <button onclick="app.markAsPaid('${e.id}')" class="bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-emerald-600 hover:border-emerald-200 px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95 flex items-center gap-1.5">
+                                        Mark Paid
+                                    </button>
+                                </div>
+                            ` : `<span class="text-slate-400 text-xs font-bold uppercase tracking-wider flex items-center justify-end gap-1"><i data-lucide="check" class="w-3.5 h-3.5"></i> Cleared</span>`}
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            },
+
+            openPaymentModal(expenseId) {
+                const expense = state.expenses.find(e => e.id === expenseId);
+                if (!expense || !state.userProfile?.upi_id) return;
+
+                state.activeExpenseId = expenseId;
+                const upiId = state.userProfile.upi_id;
+                
+                const amtEl = $('modal-amount');
+                if(amtEl) amtEl.textContent = `₹${Number(expense.amount).toFixed(2)}`;
+                
+                const upiEl = $('modal-upi-id');
+                if(upiEl) upiEl.textContent = upiId;
+
+                const qrImg = $('modal-qr-img');
+                const qrPlaceholder = $('modal-qr-placeholder');
+                
+                if (qrImg) qrImg.classList.add('hidden');
+                if (qrPlaceholder) qrPlaceholder.classList.remove('hidden');
+
+                const upiUrl = `upi://pay?pa=${upiId}&pn=Admin&am=${expense.amount}&cu=INR&tn=SnackSync`;
+                const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(upiUrl)}&margin=10`;
+                
+                if (qrImg) qrImg.src = qrUrl;
+
+                const modal = $('payment-modal');
+                const content = $('payment-modal-content');
+                if (!modal || !content) return;
+
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+                
+                setTimeout(() => {
+                    content.classList.remove('modal-exit');
+                    content.classList.add('modal-enter');
+                }, 10);
+            },
+
+            closePaymentModal() {
+                const modal = $('payment-modal');
+                const content = $('payment-modal-content');
+                if (!modal || !content) return;
+                
+                content.classList.remove('modal-enter');
+                content.classList.add('modal-exit');
+                
+                setTimeout(() => {
+                    modal.classList.add('hidden');
+                    modal.classList.remove('flex');
+                    state.activeExpenseId = null;
+                }, 300);
+            },
+
+            copyUpiId() {
+                const upiEl = $('modal-upi-id');
+                if (!upiEl) return;
+                const id = upiEl.textContent;
+                navigator.clipboard.writeText(id).then(() => {
+                    this.showToast("UPI ID Copied!", "success");
+                });
+            },
+
+            async markCurrentAsPaid() {
+                if (!state.activeExpenseId) return;
+                const btn = $('modal-confirm-btn');
+                if (!btn) return;
+                
+                const orig = btn.innerHTML;
+                btn.innerHTML = `<i data-lucide="loader-2" class="w-5 h-5 animate-spin"></i> Processing...`;
+                lucide.createIcons();
+
+                await this.markAsPaid(state.activeExpenseId);
+                this.closePaymentModal();
+                
+                btn.innerHTML = orig;
+                lucide.createIcons();
+            },
+
+            async markAsPaid(expenseId) {
+                try {
+                    const { error } = await supabase.from('expenses').update({ status: 'Paid' }).eq('id', expenseId);
+                    if (error) throw error;
+                    await this.loadData();
+                    this.showToast("Expense cleared successfully", "success");
+                    
+                    if (state.selectedMemberId) {
+                        this.renderMemberDetailModalContent();
+                        if(state.currentView === 'dashboard') this.renderDashboard();
+                        if(state.currentView === 'reports') this.renderReports();
+                    } else {
+                        if(state.currentView === 'dashboard') this.renderDashboard();
+                        if(state.currentView === 'reports') this.renderReports();
+                    }
+
+                } catch (err) {
+                    this.showToast("Update failed: " + err.message, "error");
+                }
+            },
+
+            renderAddBillView() {
+                const dateEl = $('bill-date');
+                if (dateEl) dateEl.valueAsDate = new Date();
+                const timeEl = $('bill-time');
+                if (timeEl) timeEl.value = new Date().toTimeString().slice(0,5);
+                const itemEl = $('bill-item');
+                if (itemEl) itemEl.value = '';
+                const amtEl = $('bill-amount');
+                if (amtEl) amtEl.value = '';
+
+                const container = $('split-members-container');
+                if (!container) return;
+                container.innerHTML = '';
+
+                if (state.members.length === 0) {
+                    container.innerHTML = `<p class="text-sm font-medium text-slate-500 p-6 bg-slate-50/50 rounded-xl border border-dashed border-slate-200 text-center w-full col-span-full">No team members available. Add them in the directory first.</p>`;
+                    this.updateSplitPreview();
+                    return;
+                }
+
+                state.members.forEach(m => {
+                    const div = document.createElement('div');
+                    div.className = "flex items-center gap-3 bg-white p-3 rounded-xl border border-slate-200 shadow-sm cursor-pointer hover:border-brand-300 hover:shadow-md transition-all select-none group";
+                    div.onclick = function(e) {
+                        if(e.target.tagName !== 'INPUT') {
+                            const chk = this.querySelector('input');
+                            if (chk) chk.checked = !chk.checked;
+                            app.updateSplitPreview();
+                        }
+                    };
+                    
+                    const avatarColor = this.getAvatarColor(m.name);
+                    
+                    div.innerHTML = `
+                        <input type="checkbox" value="${m.member_id}" class="split-checkbox w-4 h-4 text-brand-600 border-slate-300 rounded focus:ring-brand-500" checked onchange="app.updateSplitPreview()">
+                        <div class="w-8 h-8 rounded-full ${avatarColor} flex items-center justify-center font-bold text-xs shrink-0">${m.name.charAt(0).toUpperCase()}</div>
+                        <label class="text-sm font-semibold text-slate-700 pointer-events-none truncate flex-1">${m.name}</label>
+                    `;
+                    container.appendChild(div);
+                });
+                this.updateSplitPreview();
+            },
+
+            updateSplitPreview() {
+                const amtEl = $('bill-amount');
+                const amount = amtEl ? (parseFloat(amtEl.value) || 0) : 0;
+                const checkboxes = document.querySelectorAll('.split-checkbox:checked');
+                const count = checkboxes.length;
+
+                const prevEl = $('split-calc-preview');
+                if (!prevEl) return;
+
+                if (count === 0) {
+                    prevEl.innerHTML = `<span class="text-red-500 font-bold">Select members</span>`;
+                } else if (amount > 0) {
+                    const split = (amount / count).toFixed(2);
+                    prevEl.innerHTML = `₹${split} <span class="text-sm text-brand-600/70 font-medium">/ each</span>`;
+                } else {
+                    prevEl.innerHTML = `₹0.00 <span class="text-sm text-brand-600/70 font-medium">/ each</span>`;
+                }
+            },
+
+            toggleAllCheckboxes() {
+                const checkboxes = document.querySelectorAll('.split-checkbox');
+                const allChecked = Array.from(checkboxes).every(c => c.checked);
+                checkboxes.forEach(c => c.checked = !allChecked);
+                this.updateSplitPreview();
+            },
+
+            async handleAddBill(e) {
+                e.preventDefault();
+                const checkboxes = document.querySelectorAll('.split-checkbox:checked');
+                if (checkboxes.length === 0) {
+                    this.showToast("Select at least one member.", "error");
+                    return;
+                }
+
+                const dateEl = $('bill-date');
+                const timeEl = $('bill-time');
+                const itemEl = $('bill-item');
+                const amtEl = $('bill-amount');
+                
+                if (!dateEl || !timeEl || !itemEl || !amtEl) return;
+
+                const date = dateEl.value;
+                const time = timeEl.value;
+                const item = itemEl.value.trim();
+                const totalAmount = parseFloat(amtEl.value);
+
+                if (!item || isNaN(totalAmount) || totalAmount <= 0) {
+                    this.showToast("Invalid inputs.", "error");
+                    return;
+                }
+
+                const btn = $('submit-bill-btn');
+                if (btn) {
+                    btn.disabled = true;
+                    btn.innerHTML = `<i data-lucide="loader-2" class="w-5 h-5 animate-spin"></i> Saving...`;
+                    lucide.createIcons();
+                }
+
+                try {
+                    const { data: billData, error: billError } = await supabase.from('bills').insert({
+                        user_id: state.currentUser.id, date, time, item, total_amount: totalAmount
+                    }).select().single();
+
+                    if (billError) throw billError;
+
+                    const count = checkboxes.length;
+                    const splitAmount = Math.round((totalAmount / count) * 100) / 100;
+                    
+                    const expensesToInsert = Array.from(checkboxes).map(chk => {
+                        const mId = parseInt(chk.value);
+                        const member = state.members.find(m => m.member_id === mId);
+                        return {
+                            user_id: state.currentUser.id, bill_id: billData.id, member_id: mId,
+                            member_name: member.name, amount: splitAmount, status: 'Pending', date, time
+                        };
+                    });
+
+                    const { error: expError } = await supabase.from('expenses').insert(expensesToInsert);
+                    if (expError) throw expError;
+
+                    await this.loadData();
+                    this.showToast("Expense split & saved successfully!", "success");
+                    this.showView('dashboard');
+                } catch (err) {
+                    this.showToast(err.message, "error");
+                } finally {
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerHTML = `<i data-lucide="check" class="w-5 h-5"></i> Save Expense`;
+                        lucide.createIcons();
+                    }
+                }
+            },
+
+            renderMembers() {
+                const tbody = $('members-tbody');
+                if (!tbody) return;
+                tbody.innerHTML = '';
+                
+                const searchEl = $('search-member-input');
+                const search = searchEl ? searchEl.value.toLowerCase() : '';
+                const filteredMembers = state.members.filter(m => m.name.toLowerCase().includes(search));
+
+                if (filteredMembers.length === 0) {
+                    tbody.innerHTML = this.getEmptyStateHTML('users', 'No Members Found', 'Add people to your directory to start splitting expenses.');
+                    return;
+                }
+
+                filteredMembers.forEach(m => {
+                    const avatarColor = this.getAvatarColor(m.name);
+                    const tr = document.createElement('tr');
+                    tr.className = "hover:bg-slate-50/80 transition-colors group";
+                    tr.innerHTML = `
+                        <td class="px-6 py-4 flex items-center gap-4">
+                            <div class="w-10 h-10 rounded-full ${avatarColor} flex items-center justify-center font-bold text-sm shadow-sm border border-white/50">
+                                ${m.name.charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                                <span class="font-semibold text-slate-800 text-sm block">${m.name}</span>
+                                <span class="text-xs text-slate-400 font-medium mt-0.5 block">Joined ${new Date(m.created_at).toLocaleDateString()}</span>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 text-right">
+                             <div class="flex items-center justify-end gap-2">
+                                 <button onclick="app.editMember('${m.id}')" class="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all" title="Edit Name">
+                                    <i data-lucide="edit-2" class="w-4 h-4"></i>
+                                 </button>
+                                 <button onclick="app.deleteMember('${m.id}')" class="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all" title="Delete Member">
+                                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                 </button>
+                                 <button onclick="app.openMemberDetailModal(${m.member_id})" class="ml-2 text-xs font-bold text-slate-500 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-800 px-3 py-2 rounded-lg transition-all shadow-sm active:scale-95">Profile</button>
+                             </div>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+                lucide.createIcons();
+            },
+
+            async handleAddMember() {
+                const input = $('new-member-name');
+                if (!input) return;
+                const name = input.value.trim();
+                if (!name) return;
+
+                if (state.members.some(m => m.name.toLowerCase() === name.toLowerCase())) {
+                    this.showToast("A member with this name already exists.", "error");
+                    return;
+                }
+
+                const btn = $('add-member-btn');
+                let origHtml = '';
+                if (btn) {
+                    origHtml = btn.innerHTML;
+                    btn.disabled = true;
+                    btn.innerHTML = `<i data-lucide="loader-2" class="w-5 h-5 animate-spin"></i>`;
+                    lucide.createIcons();
+                }
+
+                try {
+                    const nextId = state.members.length > 0 ? Math.max(...state.members.map(m => m.member_id)) + 1 : 1;
+                    const { error } = await supabase.from('members').insert({
+                        user_id: state.currentUser.id, member_id: nextId, name: name
+                    });
+                    if (error) throw error;
+                    
+                    input.value = '';
+                    await this.loadData();
+                    this.showToast(`Added ${name} to team`, "success");
+                    this.renderMembers();
+                } catch (err) {
+                    this.showToast(err.message, "error");
+                } finally {
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerHTML = origHtml;
+                        lucide.createIcons();
+                    }
+                }
+            },
+
+            async editMember(id) {
+                const member = state.members.find(m => m.id === id);
+                if (!member) return;
+                
+                const newName = prompt("Enter new name for member:", member.name);
+                if (!newName || newName.trim() === '' || newName.trim() === member.name) return;
+                
+                if (state.members.some(m => m.id !== id && m.name.toLowerCase() === newName.trim().toLowerCase())) {
+                    this.showToast("A member with this name already exists.", "error");
+                    return;
+                }
+
+                try {
+                    const { error } = await supabase.from('members').update({ name: newName.trim() }).eq('id', id);
+                    if (error) throw error;
+                    
+                    await supabase.from('expenses').update({ member_name: newName.trim() }).eq('member_id', member.member_id);
+
+                    await this.loadData();
+                    this.showToast("Member updated successfully", "success");
+                    this.renderMembers();
+                } catch (err) {
+                    this.showToast(err.message, "error");
+                }
+            },
+
+            async deleteMember(id) {
+                if (!confirm("Are you sure? This will permanently delete the member and all their expense records.")) return;
+
+                try {
+                    const { error } = await supabase.from('members').delete().eq('id', id);
+                    if (error) throw error;
+                    
+                    await this.loadData();
+                    this.showToast("Member deleted successfully", "success");
+                    this.renderMembers();
+                } catch (err) {
+                    this.showToast(err.message, "error");
+                }
+            },
+
+            renderReportsViewInit() {
+                const memberSelect = $('filter-member');
+                if (memberSelect) {
+                    memberSelect.innerHTML = '<option value="all">All Members</option>';
+                    state.members.forEach(m => {
+                        const opt = document.createElement('option');
+                        opt.value = m.member_id;
+                        opt.textContent = m.name;
+                        memberSelect.appendChild(opt);
+                    });
+                }
+                this.renderReports();
+            },
+
+            renderReports() {
+                const dfEl = $('filter-date');
+                const mfEl = $('filter-member');
+                const sfEl = $('filter-status');
+                
+                const dateFilter = dfEl ? dfEl.value : 'all';
+                const memberFilter = mfEl ? mfEl.value : 'all';
+                const statusFilter = sfEl ? sfEl.value : 'all';
+
+                let filtered = [...state.expenses];
+
+                if (memberFilter !== 'all') {
+                    filtered = filtered.filter(e => e.member_id.toString() === memberFilter);
+                }
+
+                if (statusFilter !== 'all') {
+                    filtered = filtered.filter(e => e.status === statusFilter);
+                }
+
+                if (dateFilter !== 'all') {
+                    const today = new Date();
+                    today.setHours(0,0,0,0);
+                    
+                    filtered = filtered.filter(e => {
+                        const expDate = new Date(e.date);
+                        if (dateFilter === 'today') {
+                            return expDate.getTime() === today.getTime();
+                        } else if (dateFilter === 'week') {
+                            const firstDay = new Date(today.setDate(today.getDate() - today.getDay()));
+                            const lastDay = new Date(today.setDate(today.getDate() - today.getDay() + 6));
+                            return expDate >= firstDay && expDate <= lastDay;
+                        } else if (dateFilter === 'month') {
+                            return expDate.getMonth() === new Date().getMonth() && expDate.getFullYear() === new Date().getFullYear();
+                        }
+                        return true;
+                    });
+                }
+
+                const tbody = $('reports-tbody');
+                if (!tbody) return;
+                tbody.innerHTML = '';
+                
+                let totalAmount = 0;
+
+                const repTotal = $('report-total');
+
+                if (filtered.length === 0) {
+                    tbody.innerHTML = this.getEmptyStateHTML('file-search', 'No Records Found', 'Try adjusting your filters.');
+                    if (repTotal) repTotal.textContent = `Total: ₹0.00`;
+                    return;
+                }
+
+                filtered.forEach(e => {
+                    totalAmount += Number(e.amount);
+                    const bill = state.bills.find(b => b.id === e.bill_id);
+                    const itemName = bill ? bill.item : 'Shared Expense';
+                    const isPending = e.status === 'Pending';
+
+                    const tr = document.createElement('tr');
+                    tr.className = "hover:bg-slate-50/80 transition-colors";
+                    tr.innerHTML = `
+                        <td class="px-6 py-4">
+                            <p class="text-sm font-semibold text-slate-800">${new Date(e.date).toLocaleDateString()}</p>
+                            <p class="text-xs text-slate-400 font-medium">${e.time}</p>
+                        </td>
+                        <td class="px-6 py-4 text-sm font-semibold text-slate-700">${e.member_name}</td>
+                        <td class="px-6 py-4 text-sm font-medium text-slate-600 truncate max-w-[200px]">${itemName}</td>
+                        <td class="px-6 py-4 font-bold text-slate-800 text-sm">₹${Number(e.amount).toFixed(2)}</td>
+                        <td class="px-6 py-4">
+                            <span class="inline-flex items-center px-2 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider ${isPending ? 'bg-orange-100 text-orange-700' : 'bg-emerald-100 text-emerald-700'}">
+                                ${e.status}
+                            </span>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+
+                if (repTotal) repTotal.textContent = `Total: ₹${totalAmount.toFixed(2)}`;
+            },
+
+            exportCSV() {
+                const dfEl = $('filter-date');
+                const mfEl = $('filter-member');
+                const sfEl = $('filter-status');
+                
+                const dateFilter = dfEl ? dfEl.value : 'all';
+                const memberFilter = mfEl ? mfEl.value : 'all';
+                const statusFilter = sfEl ? sfEl.value : 'all';
+
+                let filtered = [...state.expenses];
+
+                if (memberFilter !== 'all') filtered = filtered.filter(e => e.member_id.toString() === memberFilter);
+                if (statusFilter !== 'all') filtered = filtered.filter(e => e.status === statusFilter);
+                if (dateFilter !== 'all') {
+                    const today = new Date();
+                    today.setHours(0,0,0,0);
+                    filtered = filtered.filter(e => {
+                        const expDate = new Date(e.date);
+                        if (dateFilter === 'today') return expDate.getTime() === today.getTime();
+                        if (dateFilter === 'week') {
+                            const firstDay = new Date(today.setDate(today.getDate() - today.getDay()));
+                            const lastDay = new Date(today.setDate(today.getDate() - today.getDay() + 6));
+                            return expDate >= firstDay && expDate <= lastDay;
+                        }
+                        if (dateFilter === 'month') return expDate.getMonth() === new Date().getMonth() && expDate.getFullYear() === new Date().getFullYear();
+                        return true;
+                    });
+                }
+
+                if (filtered.length === 0) {
+                    this.showToast("No data to export.", "error");
+                    return;
+                }
+
+                const rows = [["Date", "Time", "Member", "Item", "Amount (INR)", "Status"]];
+                
+                filtered.forEach(e => {
+                    const bill = state.bills.find(b => b.id === e.bill_id);
+                    const itemName = bill ? bill.item.replace(/,/g, '') : 'Shared Expense'; 
+                    rows.push([e.date, e.time, e.member_name, itemName, e.amount, e.status]);
+                });
+
+                const csvContent = "data:text/csv;charset=utf-8," + rows.map(e => e.join(",")).join("\n");
+                const encodedUri = encodeURI(csvContent);
+                
+                const link = document.createElement("a");
+                link.setAttribute("href", encodedUri);
+                link.setAttribute("download", `SnackSync_Report_${new Date().toISOString().split('T')[0]}.csv`);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                
+                this.showToast("CSV Export downloaded!", "success");
+            },
+
+            renderSettings() {
+                const upiEl = $('upi-id-input');
+                if (upiEl) upiEl.value = state.userProfile.upi_id || '';
+                
+                supabase.from('shared_links').select('token').eq('user_id', state.currentUser.id).maybeSingle().then(({data}) => {
+                    if (data) {
+                        const url = `${window.location.origin}${window.location.pathname}?share=${data.token}`;
+                        const slInput = $('share-link-input');
+                        if (slInput) slInput.value = url;
+                        const slOpen = $('share-link-open');
+                        if (slOpen) slOpen.href = url;
+                        const slCont = $('share-link-container');
+                        if (slCont) slCont.classList.remove('hidden');
+                        const sBtnTxt = $('share-btn-text');
+                        if (sBtnTxt) sBtnTxt.innerHTML = 'Regenerate Link';
+                    }
+                });
+            },
+
+            async saveProfile() {
+                const upiEl = $('upi-id-input');
+                if (!upiEl) return;
+                const upiId = upiEl.value.trim();
+                
+                const btn = $('save-upi-btn');
+                let origHtml = '';
+                if (btn) {
+                    origHtml = btn.innerHTML;
+                    btn.disabled = true;
+                    btn.innerHTML = `<i data-lucide="loader-2" class="w-5 h-5 animate-spin"></i> Saving...`;
+                    lucide.createIcons();
+                }
+
+                try {
+                    if (state.userProfile?.id) {
+                        await supabase.from('user_profiles').update({ upi_id: upiId }).eq('id', state.userProfile.id);
+                    } else {
+                        await supabase.from('user_profiles').insert({ user_id: state.currentUser.id, upi_id: upiId });
+                    }
+                    await this.loadData();
+                    this.showToast("Settings saved successfully", "success");
+                } catch (err) {
+                    this.showToast(err.message, "error");
+                } finally {
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerHTML = origHtml;
+                        lucide.createIcons();
+                    }
+                }
+            },
+
+            async generateShareLink() {
+                try {
+                    const { data: existing } = await supabase.from('shared_links').select('token').eq('user_id', state.currentUser.id).maybeSingle();
+                    let token = existing ? existing.token : crypto.randomUUID();
+                    
+                    if (!existing) {
+                        await supabase.from('shared_links').insert({ user_id: state.currentUser.id, token: token });
+                    }
+                    
+                    const url = `${window.location.origin}${window.location.pathname}?share=${token}`;
+                    const slInput = $('share-link-input');
+                    if (slInput) slInput.value = url;
+                    const slOpen = $('share-link-open');
+                    if (slOpen) slOpen.href = url;
+                    const slCont = $('share-link-container');
+                    if (slCont) slCont.classList.remove('hidden');
+                    const sBtnTxt = $('share-btn-text');
+                    if (sBtnTxt) sBtnTxt.textContent = 'Regenerate Link';
+                    this.showToast("Public link generated", "success");
+                } catch (err) {
+                    this.showToast(err.message, "error");
+                }
+            },
+
+            copyShareLink() {
+                const input = $('share-link-input');
+                if (input) {
+                    input.select();
+                    document.execCommand('copy');
+                    this.showToast("Link copied to clipboard", "success");
+                }
+            },
+
+            async loadSharedDashboard(token) {
+                try {
+                    const { data, error } = await supabase.rpc('get_shared_dashboard', { p_token: token });
+                    if (error || !data) throw new Error("Invalid or Expired Link");
+
+                    const { members, expenses, profile } = data;
+                    
+                    let totalPending = 0;
+                    const tbody = $('shared-tbody');
+                    if (!tbody) return;
+                    tbody.innerHTML = '';
+
+                    const stats = members.map(m => {
+                        const mExps = expenses.filter(e => e.member_id === m.member_id);
+                        const pending = mExps.filter(e => e.status === 'Pending').reduce((s, e) => s + Number(e.amount), 0);
+                        totalPending += pending;
+                        return { ...m, pending };
+                    }).filter(m => m.pending > 0).sort((a,b) => b.pending - a.pending);
+
+                    const stpEl = $('shared-total-pending');
+                    if (stpEl) stpEl.textContent = `₹${totalPending.toFixed(2)}`;
+
+                    if (stats.length === 0) {
+                        tbody.innerHTML = `<tr><td colspan="2" class="p-10 text-center text-emerald-600 font-bold bg-emerald-50/50 text-lg border-t border-emerald-100">🎉 All dues are cleared!</td></tr>`;
+                    } else {
+                        stats.forEach(m => {
+                            const avatarColor = this.getAvatarColor(m.name);
+                            const tr = document.createElement('tr');
+                            tr.innerHTML = `
+                                <td class="px-8 py-5 flex items-center gap-4">
+                                    <div class="w-12 h-12 rounded-2xl ${avatarColor} flex items-center justify-center font-bold text-lg shadow-sm border border-white/50">
+                                        ${m.name.charAt(0).toUpperCase()}
+                                    </div>
+                                    <span class="font-bold text-slate-800 text-lg">${m.name}</span>
+                                </td>
+                                <td class="px-8 py-5 text-right font-black text-orange-600 text-xl tracking-tight">₹${m.pending.toFixed(2)}</td>
+                            `;
+                            tbody.appendChild(tr);
+                        });
+                    }
+
+                    if (profile?.upi_id && totalPending > 0) {
+                        const spiEl = $('shared-payment-info');
+                        if (spiEl) spiEl.classList.remove('hidden');
+                        
+                        const suiEl = $('shared-upi-id');
+                        if (suiEl) suiEl.textContent = profile.upi_id;
+                        
+                        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=upi://pay?pa=${profile.upi_id}&pn=Admin`;
+                        const sqiEl = $('shared-qr-img');
+                        if (sqiEl) sqiEl.src = qrUrl;
+                    }
+
+                    setTimeout(() => lucide.createIcons(), 10);
+                } catch (err) {
+                    const sc = $('shared-container');
+                    if (sc) {
+                        sc.innerHTML = `<div class="flex flex-col items-center justify-center min-h-[60vh]"><div class="p-4 bg-red-50 text-red-600 rounded-2xl font-semibold border border-red-100 flex items-center gap-2"><i data-lucide="alert-circle"></i> ${err.message}</div></div>`;
+                        lucide.createIcons();
+                    }
+                }
+            }
+        };
+
+        // Ensuring DOM is fully loaded before referencing ANY elements or bindings
+        document.addEventListener('DOMContentLoaded', () => {
+            if(window.app && typeof window.app.init === 'function') {
+                window.app.init();
+            }
+        });
+    </script>
+</body>
+</html>

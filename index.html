@@ -591,9 +591,7 @@
     </div>
 
     <!-- PURE JAVASCRIPT APPLICATION LOGIC -->
-    <!-- 🔥 ONLY CHANGES PART (SCRIPT SECTION REPLACE KAR) -->
-
-<script type="module">
+    <script type="module">
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
 const supabase = createClient(
@@ -612,6 +610,18 @@ const state = {
 
 window.app = {
 
+    // 🔥 GLOBAL LOADER FIX
+    hideGlobalLoader() {
+        const loader = document.getElementById("global-loader");
+        if (!loader) return;
+
+        loader.style.opacity = "0";
+
+        setTimeout(() => {
+            loader.style.display = "none";
+        }, 500);
+    },
+
     async init() {
         const urlParams = new URLSearchParams(window.location.search);
         const shareId = urlParams.get("share");
@@ -626,10 +636,17 @@ window.app = {
         const { data: { user } } = await supabase.auth.getUser();
 
         if (user) {
-            this.handleAuthSuccess(user);
+            try {
+                await this.handleAuthSuccess(user);
+            } catch (e) {
+                console.error("Init Error:", e);
+            }
         } else {
             document.getElementById("login-container").style.display = "flex";
         }
+
+        // 🔥 SAFETY (loader stuck na rahe)
+        this.hideGlobalLoader();
     },
 
     // ✅ FIXED AUTH SUCCESS
@@ -641,27 +658,39 @@ window.app = {
 
         await this.loadData();
 
-        // 🔥 MOST IMPORTANT FIX
-        await this.updateShare(user);
+        // 🔥 ERROR SAFE SHARE UPDATE
+        try {
+            await this.updateShare(user);
+        } catch (e) {
+            console.error("Share update error:", e);
+        }
 
         this.renderShareLink();
+
+        // 🔥 IMPORTANT
+        this.hideGlobalLoader();
     },
 
     // ✅ LOAD USER DATA
     async loadData() {
-        const { data: members } = await supabase.from('members').select("*");
-        const { data: expenses } = await supabase.from('expenses').select("*");
-        const { data: profile } = await supabase.from('user_profiles')
-            .select("*")
-            .eq("user_id", state.currentUser.id)
-            .maybeSingle();
+        try {
+            const { data: members } = await supabase.from('members').select("*");
+            const { data: expenses } = await supabase.from('expenses').select("*");
+            const { data: profile } = await supabase.from('user_profiles')
+                .select("*")
+                .eq("user_id", state.currentUser.id)
+                .maybeSingle();
 
-        state.members = members || [];
-        state.expenses = expenses || [];
-        state.userProfile = profile || {};
+            state.members = members || [];
+            state.expenses = expenses || [];
+            state.userProfile = profile || {};
+
+        } catch (e) {
+            console.error("Load data error:", e);
+        }
     },
 
-    // ✅ 🔥 FIXED SHARE UPDATE
+    // ✅ SHARE UPDATE SAFE
     async updateShare(user) {
         if (!user) return;
 
@@ -674,16 +703,22 @@ window.app = {
 
         console.log("Saving Share Data:", payload);
 
-        const { error } = await supabase.from("shares").upsert({
-            id: user.id,
-            data: payload,
-            updated_at: new Date().toISOString()
-        });
+        try {
+            const { error } = await supabase.from("shares").upsert({
+                id: user.id,
+                data: payload,
+                updated_at: new Date().toISOString()
+            });
 
-        if (error) {
-            console.error("Share Update Error:", error);
-        } else {
+            if (error) {
+                console.error("❌ Share Error:", error);
+                return;
+            }
+
             console.log("✅ Share Updated");
+
+        } catch (err) {
+            console.error("❌ Share Crash:", err);
         }
     },
 
@@ -705,41 +740,40 @@ window.app = {
         alert("Link copied!");
     },
 
-    // ✅ 🔥 FIXED SHARED LOAD
+    // ✅ SHARED MODE LOAD
     async loadSharedData(shareId) {
-    console.log("Share ID:", shareId);
+        console.log("Share ID:", shareId);
 
-    state.isSharedMode = true;
+        state.isSharedMode = true;
 
-    this.showSharedContainer();
+        document.getElementById("shared-container").style.display = "block";
 
-    try {
-        const { data, error } = await supabase
-            .from("shares")
-            .select("*")
-            .eq("id", shareId)
-            .maybeSingle();
+        try {
+            const { data, error } = await supabase
+                .from("shares")
+                .select("*")
+                .eq("id", shareId)
+                .maybeSingle();
 
-        console.log("Fetched Data:", data);
+            console.log("Fetched Data:", data);
 
-        // 🔥 LOADER HIDE ALWAYS
-        this.hideGlobalLoader();
+            this.hideGlobalLoader();
 
-        if (error || !data || !data.data) {
-            this.showShareError("Invalid Link", "No data found for this share link.");
-            return;
+            if (error || !data || !data.data) {
+                alert("Invalid Share Link");
+                return;
+            }
+
+            this.renderSharedData(data.data);
+
+        } catch (err) {
+            console.error(err);
+            this.hideGlobalLoader();
+            alert("Something went wrong");
         }
+    },
 
-        this.renderSharedData(data.data);
-
-    } catch (err) {
-        console.error(err);
-        this.hideGlobalLoader();
-        this.showShareError("Error", "Something went wrong.");
-    }
-},
-
-    // ✅ RENDER SHARED
+    // ✅ RENDER SHARED DATA
     renderSharedData(payload) {
         const tbody = document.getElementById("shared-tbody");
         tbody.innerHTML = "";
@@ -748,6 +782,7 @@ window.app = {
 
         payload.members.forEach(m => {
             const exps = payload.expenses.filter(e => e.member_id === m.member_id);
+
             const pending = exps
                 .filter(e => e.status === "Pending")
                 .reduce((s, e) => s + Number(e.amount), 0);

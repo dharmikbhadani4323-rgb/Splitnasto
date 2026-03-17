@@ -769,79 +769,97 @@
             },
 
             async loadSharedData(shareId) {
-    console.log("Share ID:", shareId);
+            console.log("Querying share id:", shareId); // ✅ ONLY HERE
 
-    state.isSharedMode = true;
+            state.isSharedMode = true;
 
-    document.getElementById("shared-container").style.display = "block";
+            document.getElementById("shared-container").style.display = "block";
 
-    try {
-        const { data, error } = await supabase
-            .from("shares")
-            .select("*")
-            .eq("id", shareId)
-            .maybeSingle();
+            try {
+                    const { data, error } = await supabase
+                        .from("shares")
+                        .select("*")
+                        .eq("id", shareId)
+                        .maybeSingle();
 
-        console.log("Fetched Data:", data);
+                    console.log("Fetched Data:", data);
+                    if (error) console.error(error);
 
-        if (error || !data || !data.data) {
-            console.error("❌ Invalid Share Data");
-            alert("Invalid Share Link");
-            return;
-        }
+                    if (!data || !data.data) {
+                        this.showSharedContainer();
+                        this.showShareError("Invalid Link", "This share link does not exist or has been removed.");
+                        this.hideGlobalLoader();
+                        return;
+                    }
 
-        // 🔥 SAFE PAYLOAD
-        const payload = data.data || {};
-        payload.members = payload.members || [];
-        payload.expenses = payload.expenses || [];
-
-        try {
-            this.renderSharedData(payload);
-        } catch (e) {
-            console.error("Render error:", e);
-        }
-
-    } catch (err) {
-        console.error("❌ Share Load Error:", err);
-    }
-
-    // 🔥 ALWAYS HIDE LOADER (NO MATTER WHAT)
-    this.hideGlobalLoader();
-},
-     
+                    this.showSharedContainer();
+                    this.renderSharedData(data.data);
+                    this.hideGlobalLoader();
+                    
+                } catch (err) {
+                    console.error("[Share] Load Error:", err);
+                    this.showSharedContainer();
+                    this.showShareError("Failed to load data", "An unexpected network or database error occurred.");
+                    this.hideGlobalLoader();
+                }
+            },
 
             renderSharedData(payload) {
-    const tbody = document.getElementById("shared-tbody");
-    if (!tbody) return;
+                try {
+                    const { members, expenses, profile } = payload;
+                    
+                    let totalPending = 0;
+                    const tbody = $('shared-tbody');
+                    if (!tbody) return;
+                    tbody.innerHTML = '';
 
-    tbody.innerHTML = "";
+                    const stats = (members || []).map(m => {
+                        const mExps = (expenses || []).filter(e => e.member_id === m.member_id);
+                        const pending = mExps.filter(e => e.status === 'Pending').reduce((s, e) => s + Number(e.amount), 0);
+                        totalPending += pending;
+                        return { ...m, pending };
+                    }).filter(m => m.pending > 0).sort((a,b) => b.pending - a.pending);
 
-    let total = 0;
+                    const stpEl = $('shared-total-pending');
+                    if (stpEl) stpEl.textContent = `₹${totalPending.toFixed(2)}`;
 
-    (payload.members || []).forEach(m => {
-        const exps = (payload.expenses || []).filter(e => e.member_id === m.member_id);
+                    if (stats.length === 0) {
+                        tbody.innerHTML = `<tr><td colspan="2" class="p-10 text-center text-emerald-600 font-bold bg-emerald-50/50 text-lg border-t border-emerald-100">🎉 All dues are cleared!</td></tr>`;
+                    } else {
+                        stats.forEach(m => {
+                            const avatarColor = this.getAvatarColor(m.name);
+                            const tr = document.createElement('tr');
+                            tr.innerHTML = `
+                                <td class="px-8 py-5 flex items-center gap-4">
+                                    <div class="w-12 h-12 rounded-2xl ${avatarColor} flex items-center justify-center font-bold text-lg shadow-sm border border-white/50">
+                                        ${m.name.charAt(0).toUpperCase()}
+                                    </div>
+                                    <span class="font-bold text-slate-800 text-lg">${m.name}</span>
+                                </td>
+                                <td class="px-8 py-5 text-right font-black text-orange-600 text-xl tracking-tight">₹${m.pending.toFixed(2)}</td>
+                            `;
+                            tbody.appendChild(tr);
+                        });
+                    }
 
-        const pending = exps
-            .filter(e => e.status === "Pending")
-            .reduce((s, e) => s + Number(e.amount || 0), 0);
+                    if (profile?.upi_id && totalPending > 0) {
+                        const spiEl = $('shared-payment-info');
+                        if (spiEl) spiEl.classList.remove('hidden');
+                        
+                        const suiEl = $('shared-upi-id');
+                        if (suiEl) suiEl.textContent = profile.upi_id;
+                        
+                        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=upi://pay?pa=${profile.upi_id}&pn=Admin`;
+                        const sqiEl = $('shared-qr-img');
+                        if (sqiEl) sqiEl.src = qrUrl;
+                    }
 
-        if (pending > 0) {
-            total += pending;
-
-            tbody.innerHTML += `
-                <tr>
-                    <td>${m.name || '-'}</td>
-                    <td>₹${pending.toFixed(2)}</td>
-                </tr>
-            `;
-        }
-    });
-
-    const totalEl = document.getElementById("shared-total-pending");
-    if (totalEl) {
-        totalEl.innerText = `₹${total.toFixed(2)}`;
-    }
-},
+                    setTimeout(() => lucide.createIcons(), 10);
+                } catch (err) {
+                    console.error("Error rendering permanent shared dashboard:", err);
+                    this.showShareError("Error", "Could not render the shared dashboard.");
+                }
+            },
 
             showShareError(title, subtitle) {
                 const container = $('shared-container');
@@ -924,9 +942,9 @@
                 
                 const hdrUserEmail = $('header-user-email');
                 if (hdrUserEmail) hdrUserEmail.textContent = user.email;
-                // const usrEmailDisp = $('user-email-display');
-                // if (usrEmailDisp) usrEmailDisp.textContent = user.email;
-                <span id="user-email-display"></span>
+                const usrEmailDisp = $('user-email-display');
+                if (usrEmailDisp) usrEmailDisp.textContent = user.email;
+                
                 this.showAppContainer();
                 
                 this.loadData().then(async () => {

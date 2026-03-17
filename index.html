@@ -707,10 +707,13 @@ window.app = {
 
     // ✅ 🔥 FIXED SHARED LOAD
     async loadSharedData(shareId) {
-        console.log("Share ID:", shareId);
+    console.log("Share ID:", shareId);
 
-        document.getElementById("shared-container").style.display = "block";
+    state.isSharedMode = true;
 
+    this.showSharedContainer();
+
+    try {
         const { data, error } = await supabase
             .from("shares")
             .select("*")
@@ -719,14 +722,22 @@ window.app = {
 
         console.log("Fetched Data:", data);
 
-        if (error || !data || !data.data || !data.data.members) {
-            document.getElementById("shared-container").innerHTML =
-                "<h2 style='text-align:center;margin-top:100px'>Invalid Link</h2>";
+        // 🔥 LOADER HIDE ALWAYS
+        this.hideGlobalLoader();
+
+        if (error || !data || !data.data) {
+            this.showShareError("Invalid Link", "No data found for this share link.");
             return;
         }
 
         this.renderSharedData(data.data);
-    },
+
+    } catch (err) {
+        console.error(err);
+        this.hideGlobalLoader();
+        this.showShareError("Error", "Something went wrong.");
+    }
+},
 
     // ✅ RENDER SHARED
     renderSharedData(payload) {

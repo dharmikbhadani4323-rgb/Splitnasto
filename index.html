@@ -942,9 +942,9 @@
                 
                 const hdrUserEmail = $('header-user-email');
                 if (hdrUserEmail) hdrUserEmail.textContent = user.email;
-                const usrEmailDisp = $('user-email-display');
-                if (usrEmailDisp) usrEmailDisp.textContent = user.email;
-                
+                // const usrEmailDisp = $('user-email-display');
+                // if (usrEmailDisp) usrEmailDisp.textContent = user.email;
+                <span id="user-email-display"></span>
                 this.showAppContainer();
                 
                 this.loadData().then(async () => {

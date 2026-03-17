@@ -801,6 +801,43 @@
                 // 🔥 ALWAYS RUN
                 this.hideGlobalLoader();
             },
+            
+async init() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const shareId = urlParams.get("share");
+
+    // 🔥 SHARE MODE
+    if (shareId) {
+        try {
+            await this.loadSharedData(shareId);
+        } catch (e) {
+            console.error("Share load error:", e);
+        }
+
+        // 🔥 SAFETY (loader atki na rahe)
+        this.hideGlobalLoader();
+        return;
+    }
+
+    // 🔥 AUTH CHECK
+    try {
+        const { data: { user } } = await supabase.auth.getUser();
+
+        if (user) {
+            await this.handleAuthSuccess(user);
+        } else {
+            document.getElementById("login-container").style.display = "flex";
+        }
+
+    } catch (e) {
+        console.error("Init error:", e);
+    }
+
+    // 🔥 FINAL SAFETY (no infinite loader ever)
+    setTimeout(() => {
+        this.hideGlobalLoader();
+    }, 3000);
+},
 
             renderSharedData(payload) {
                 try {

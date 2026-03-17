@@ -301,9 +301,7 @@
                                         <th class="px-6 py-4">Item</th>
                                         <th class="px-6 py-4">Amount</th>
                                         <th class="px-6 py-4">Status</th>
-                                        <!-- SHARE FEATURE START -->
                                         <th class="px-6 py-4 text-center">Action</th>
-                                        <!-- SHARE FEATURE END -->
                                     </tr>
                                 </thead>
                                 <tbody id="reports-tbody" class="divide-y divide-slate-100/80 bg-white">
@@ -663,6 +661,7 @@
                 const sBillCont = $('shared-bill-container'); // SHARE FEATURE
                 if (sBillCont) sBillCont.style.display = 'none'; // SHARE FEATURE
             },
+            
             // SHARE FEATURE START
             showSharedBillContainer() {
                 const appCont = $('app-container'); if (appCont) appCont.style.display = 'none';
@@ -715,27 +714,39 @@
 
                     const loadShare = async () => {
                         try {
-                            // If it matches a 36-char UUID format, try loading full JSON data from 'shares' table
                             if (shareId.length === 36) {
                                 console.log("[Share] Fetching data from 'shares' table...");
+                                
+                                // Fetching using maybeSingle to avoid errors if no rows found
                                 const { data, error } = await supabase
                                     .from("shares")
                                     .select("*")
                                     .eq("id", shareId)
-                                    .single();
+                                    .maybeSingle();
 
-                                console.log("[Share] Share data fetched:", data);
-                                if (error) console.log("[Share] Fetch Error:", error);
+                                console.log("[Share] Fetched Data:", data);
+                                if (error) console.error("[Share] Fetch Error:", error);
 
                                 if (!data || !data.data) {
-                                    console.log("[Share] Data not found or invalid.");
+                                    console.warn("[Share] Data not found or invalid.");
                                     app.showSharedBillContainer();
-                                    app.showInvalidShareLink($('shared-bill-container'));
+                                    app.showShareError("Invalid Link", "This share link does not exist or has been removed.");
                                     app.hideGlobalLoader();
                                     return;
                                 }
 
-                                // Successfully retrieved the nested JSON payload
+                                // Expiration Check
+                                if (data.expires_at) {
+                                    const expiryDate = new Date(data.expires_at);
+                                    if (new Date() > expiryDate) {
+                                        console.warn("[Share] Link has expired.");
+                                        app.showSharedBillContainer();
+                                        app.showShareError("Link Expired", "This share link has expired and is no longer valid.");
+                                        app.hideGlobalLoader();
+                                        return;
+                                    }
+                                }
+
                                 console.log("[Share] Valid JSON payload found, rendering UI.");
                                 app.showSharedBillContainer();
                                 app.renderSharedBill(data.data);
@@ -743,7 +754,7 @@
                                 return;
                             }
                             
-                            // If not a UUID or UUID bypass, fallback to original dashboard share RPC logic
+                            // Original fallback mechanism for Dashboard tokens
                             app.showSharedContainer();
                             await app.loadSharedDashboard(shareId);
                             app.hideGlobalLoader();
@@ -751,13 +762,13 @@
                         } catch (err) {
                             console.error("[Share] Exception during share load:", err);
                             app.showSharedBillContainer();
-                            app.showInvalidShareLink($('shared-bill-container'));
+                            app.showShareError("Failed to load data", "An unexpected error occurred while loading the link.");
                             app.hideGlobalLoader();
                         }
                     };
 
                     loadShare();
-                    return; // Return immediately to prevent auth flow from running for shared links
+                    return; // Prevent normal login flow
                 }
                 // SHARE FEATURE END
 
@@ -804,15 +815,19 @@
                     const shareId = crypto.randomUUID();
                     console.log(`[Share] Created UUID: ${shareId}`);
                     
+                    // Set expiration to 7 days from now
+                    const expiresAt = new Date();
+                    expiresAt.setDate(expiresAt.getDate() + 7);
+                    
                     const payloadData = {
                         bill: bill,
                         expenses: expenses
                     };
 
-                    // Insert full JSON into the data column
                     const { error } = await supabase.from('shares').insert({
                         id: shareId,
-                        data: payloadData
+                        data: payloadData,
+                        expires_at: expiresAt.toISOString()
                     });
 
                     if (error) {
@@ -882,20 +897,21 @@
                     lucide.createIcons();
                 } catch (err) {
                     console.error("Error rendering shared bill data:", err);
-                    this.showInvalidShareLink(sbCont);
+                    this.showShareError("Error", "Could not render the bill details.");
                 }
             },
 
-            showInvalidShareLink(container) {
+            showShareError(title, subtitle) {
+                const container = $('shared-bill-container');
                 if (!container) return;
                 container.innerHTML = `
                     <div class="flex flex-col items-center justify-center min-h-screen w-full bg-[#F8FAFC] p-4">
                         <div class="bg-white p-8 rounded-2xl shadow-soft text-center max-w-sm w-full border border-slate-200 animate-in fade-in zoom-in-95">
-                            <div class="bg-red-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <div class="bg-red-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
                                 <i data-lucide="link-2-off" class="w-8 h-8 text-red-400"></i>
                             </div>
-                            <h2 class="text-xl font-bold text-slate-800 tracking-tight">Invalid or Expired Link</h2>
-                            <p class="text-slate-500 mt-2 text-sm font-medium">This share link does not exist or has been removed.</p>
+                            <h2 class="text-xl font-bold text-slate-800 tracking-tight">${title}</h2>
+                            <p class="text-slate-500 mt-2 text-sm font-medium">${subtitle}</p>
                         </div>
                     </div>
                 `;
